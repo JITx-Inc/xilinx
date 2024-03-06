@@ -1,0 +1,51 @@
+#use-added-syntax(tests)
+defpackage xilinx/tests/pinouts:
+  import core
+  import xilinx/pinouts
+
+
+deftest(pinouts) test-basic:
+  val data-dir = "./tests/data/pinouts"
+  val all-files = dir-files(data-dir, false)
+  val pinout-files = for f in all-files filter:
+    suffix?(f, ".csv")
+
+  for fname in pinout-files do:
+    val fpath = string-join([data-dir, fname], "/")
+    val r = load-pinout(fpath)
+    #EXPECT(length(pins(r)) > 0)
+    println("Found %_ Pins" % [length(pins(r))])
+
+deftest(pinouts) test-exhaustive:
+  ; NOTE: This test assumes that you have downloaded
+  ;  and extracted the zip files containing the pinout
+  ;  CSV files for various Xilinx familes of parts into
+  ;  the `pinouts` directory
+  label<False> return:
+    val root-dir = "./pinouts"
+    if not file-exists?(root-dir):
+      println("No './pinouts' Directory Found - Skipping Exhaustive Test")
+      return(false)
+
+    val families = for f in dir-files(root-dir, false) filter:
+      val fpath = string-join([root-dir, f], "/")
+      file-type(fpath) is DirectoryType
+
+    for family in families do:
+      val fam-dir = string-join([root-dir, family], "/")
+
+      val pinout-files = for f in dir-files(fam-dir, false) filter:
+        suffix?(f, ".csv")
+
+      for fname in pinout-files do:
+        val fpath = string-join([fam-dir, fname], "/")
+        println("File: %_" % [fpath])
+        val r = load-pinout(fpath)
+        #EXPECT(length(pins(r)) > 0)
+        println("Found %_ Pins" % [length(pins(r))])
+
+
+
+
+
+

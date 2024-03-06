@@ -1,0 +1,196 @@
+defpackage xilinx/pinouts:
+  import core
+
+val HDR_PIN = "Pin"
+val HDR_PIN_NAME = "Pin Name"
+val HDR_MEM_GRP = "Memory Byte Group"
+val HDR_BANK = "Bank"
+
+val HDR_IO_TYPE = "I/O Type"
+val HDR_SLR = "Super Logic Region"
+val HDR_PERF = "XPIO/GTM Perf"
+val HDR_PERF_2 = "XPIOPerf"
+val HDR_DDRMC_ONLY = "DDRMC ONLY"
+val HDR_VCCAUX_GRP = "VCCAUX Group"
+
+; NA (Not Applicable) Converts to None
+
+public defstruct PinDescriptor <: Equalable & Hashable:
+  pin-ref:String
+  name:String
+  mem-byte-grp:Maybe<Int>
+  ; NA for for Ground, VCCINT, VCCAUX, VCCADC, VCCBRAM
+  ; Int for IO and for VCCO
+  ; For NC, this value may be NOPAD/UNCONNECTED, but NA is a more common value.
+  bank:Maybe<Int>
+  ; CONFIG, HP, GTH
+  io-type:Maybe<String>
+  ; NA or Int
+  vccaux-group:Maybe<Int>
+  ; NA or Int
+  super-logic-region:Maybe<Int>
+with:
+  equalable => true
+  hashable => true
+  printer => true
+
+defn to-maybe-int (v?:Maybe<String>) -> Maybe<Int> :
+  match(v?):
+    (_:None): None()
+    (v:One<String>):
+      match(to-int(value(v))):
+        (_:False): None()
+        (x:Int): One(x)
+
+public defn get-by-key (params:Tuple<KeyValue<String, String>>, key-name:String) -> Maybe<String> :
+  for p in params first:
+    if key(p) == key-name:
+      One(value(p))
+    else:
+      None()
+
+public defn PinDescriptor (params:Tuple<KeyValue<String, String>>) -> PinDescriptor:
+  PinDescriptor(
+    value! $ get-by-key(params, HDR_PIN)
+    value! $ get-by-key(params, HDR_PIN_NAME)
+    get-by-key(params, HDR_MEM_GRP) $> to-maybe-int
+    get-by-key(params, HDR_BANK) $> to-maybe-int
+    get-by-key(params, HDR_IO_TYPE)
+    get-by-key(params, HDR_VCCAUX_GRP) $> to-maybe-int
+    get-by-key(params, HDR_SLR) $> to-maybe-int
+  )
+
+public defstruct XilinxPinout <: Equalable & Hashable:
+  device:String
+  revision:String
+  status:String
+
+  pins:Tuple<PinDescriptor>
+
+  ; This value is the reported pin number so that we can
+  ;  check out parsing routine.
+  total-pins:Int
+with:
+  equalable => true
+  hashable => true
+  printer => true
+
+defn get-lines (s:InputStream) -> Seq<String> :
+  generate<String> :
+    val buf = StringBuffer(128)
+    while true:
+      val curr? = get-char(s)
+      match(curr?):
+        (_:False):
+          break( to-string(buf) )
+        (curr:Char):
+          if curr == '\n':
+            yield( to-string(buf) )
+            clear(buf)
+          else:
+            add(buf, curr)
+
+defn split-n-trim (line:String) -> Tuple<String> :
+  val comps = to-tuple $ for comp in split(line, ",") seq?:
+    val ret = trim(comp)
+    if length(ret) > 0:
+      One(ret)
+    else:
+      None()
+  if length(comps) > 0 and (prefix?(comps[0], "\"") or prefix?(comps[0], "#")):
+    ; The copyright header and meta data
+    ;  starts with a '"'
+    [line]
+  else:
+    comps
+
+defn make-dict (header:Tuple<String>, comps:Tuple<String>) -> Tuple<KeyValue<String, String>> :
+  to-tuple $ for (h in header, c in comps) seq:
+    KeyValue(h, c)
+
+defn process-header-lines (comps:Tuple<String>) -> Maybe<Tuple<String>> :
+  if length(comps) == 1 :
+    if prefix?(comps[0], "\""):
+      ; This is the new meta data with copyright license
+      ;  and revision history data
+      ; TODO: Attempt to find the meta data strings
+      None()
+    else if prefix?(comps[0], "#"):
+      ; Some files don't have the starting \"
+      None()
+    else:
+      ; This is the old meta data line
+      ;  without copyright info.
+      ; TODO - Parse out Data
+      None()
+  else if length(comps) > 2 :
+    val header = One(comps)
+    if comps[0] != HDR_PIN:
+      throw $ Exception("Invalid Header - Did not see 'Pin' as first column: %_" % [line])
+    header
+  else:
+    ; Empty Line
+    None()
+
+defn extract-pin-cnt (comps:Tuple<String>) -> Maybe<Int> :
+  if length(comps) == 1:
+    ; The Versal Chips have a different format for the total pin numbers:
+    ; "#Total Number of Pins 5436
+    val parts = to-tuple $ split(comps[0], " ")
+    if length(parts) < 2:
+      None()
+    else:
+      val pinCntStr = trim $ parts[length(parts) - 1]
+      match(to-int(pinCntStr)):
+        (v:Int): One(v)
+        (_:False):
+          throw $ Exception("Failed to Parse Pin Count: %_" % [line])
+  else if length(comps) == 2:
+    ; Final line contains "Total Number of Pins,####,,,," or similar
+    match(to-int(comps[1])):
+      (v:Int): One(v)
+      (_:False):
+        throw $ Exception("Failed to Parse Pin Count: %_" % [line])
+  else:
+    None()
+
+public defn load-pinout (s:InputStream) -> XilinxPinout :
+
+  var pin-cnt:Int = -1
+  var header:Maybe<Tuple<String>> = None()
+  val pins = to-tuple $ for line in get-lines(s) seq?:
+    val comps = split-n-trim(line)
+    if header is None:
+      val ret? = process-header-lines(comps)
+      match(ret?):
+        (_:None): None()
+        (ret:One<Tuple<String>>):
+          header = ret
+      None()
+    else:
+      if length(comps) > 2:
+        val dict = make-dict(value!(header), comps)
+        One $ PinDescriptor(dict)
+      else:
+        if pin-cnt > 0:
+          val ret? = extract-pin-cnt(comps)
+          match(ret?):
+            (_:None): None()
+            (ret:One<Int>):
+              pin-cnt = value(ret)
+              println("Pin Count: %_" % [pin-cnt])
+
+        None()
+  XilinxPinout("UNKNOWN","UNKNOWN","UNKNOWN", pins, pin-cnt)
+
+
+public defn load-pinout (fpath:String) -> XilinxPinout :
+  val fs = FileInputStream(fpath)
+  try:
+    load-pinout(fs)
+  finally:
+    close(fs)
+
+
+
+
