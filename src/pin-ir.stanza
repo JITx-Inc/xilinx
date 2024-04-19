@@ -1,0 +1,269 @@
+doc: \<DOC>
+Xilinx Pin Intermediate Representation
+
+This file contains the definition of some base classes for
+defining the pin functions for the pins of a Xilinx FPGA.
+
+The concept is to provide various flags and meta-data for
+describing how a function is used in a particular package.
+
+Specific platforms may need to provide their own custom
+`SpecialFunction` types which can be added to the files in
+the `platforms/` directory.
+<DOC>
+defpackage xilinx/pin-ir:
+  import core
+
+  import xilinx/errors
+
+
+doc: \<DOC>
+Special Function pins on the Xilinx FPGA
+
+Special function pins are either:
+
+1.  Dedicated - meaning that they have a sole or limited set of functions and generally can't be used as IO.
+2.  Multi-Function - meaning that they can be IO or some limited set of special functions depending on
+    device state or configuration.
+
+<DOC>
+public deftype SpecialFunction <: Equalable
+
+doc: \<DOC>
+Indexable Type
+
+Many of the configuration bits are an array of bits.
+This type provides a parameter interface for those types
+that indicates their position in the ordering.
+<DOC>
+public deftype IndexableType
+public defmulti index (s:IndexableType) -> Int
+
+public defenum Diff-Polarity:
+  Diff-P
+  Diff-N
+
+doc: \<DOC>
+Polarized Type
+
+This flag is used to mark a special function as being differential
+The `polarity` parameter is used to mark this pin as either the
+positive or negative side of the differential function.
+<DOC>
+public deftype PolarizedType
+public defmulti polarity (p:PolarizedType) -> Diff-Polarity
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;  Cardinality
+; This specifies the input/output nature
+;  of a particular pin.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+public deftype CardinalityType <: SpecialFunction
+
+public defstruct InputType <: CardinalityType
+public defstruct OutputType <: CardinalityType
+public defstruct BidirType <: CardinalityType
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Configuration Functions
+;
+;  Common Signal Type configurations that are
+;  supported by multiple platforms.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+doc: \<DOC>
+Configuration Type Function
+
+The configuration functions are used to program the FPGA
+and configure the features at runtime.
+<DOC>
+public defstruct ConfigType <: SpecialFunction
+
+public defenum ConfigBus:
+  DataBus
+  AddressBus
+
+doc: \<DOC>
+Configuration Data/Address Bus Functions
+
+The configuration interface typically has a data and
+address bus that are used in certain configuration modes.
+<DOC>
+public defstruct ConfigBusType <: ConfigType & IndexableType :
+  bus-type:ConfigBus
+  index:Int with: (as-method => true)
+
+doc: \<DOC>
+Configuration Mode Function Types
+
+These bits typically determine how the FPGA loads its
+configuration.
+<DOC>
+public defstruct ConfigModeType <: ConfigType & IndexableType :
+  index:Int with: (as-method => true)
+
+
+public defenum JTAGBus:
+  TCK
+  TMS
+  TDI
+  TDO
+
+doc: \<DOC>
+JTAG Bus Interface Functions
+<DOC>
+public defstruct JTAGType <: ConfigType :
+  signal:JTAGBus
+
+doc: \<DOC>
+Revision Select Function Type
+<DOC>
+public defstruct RevisionType <: ConfigType & IndexableType :
+  index:Int with: (as-method => true)
+
+
+doc: \<DOC>
+Differential Pair Special Function
+
+This object flags a particular IO pin as a one
+part of a differential pair.
+<DOC>
+public defstruct DifferentialIOType <: SpecialFunction & PolarizedType :
+  polarity:Diff-Polarity with: ( as-method => true )
+
+doc: \<DOC>
+Per Bank VREF pin
+
+Some devices use a dedicated pin (ultrascale) and others
+have a multi-function (7 series)
+<DOC>
+public defstruct VREFType <: SpecialFunction
+
+doc: \<DOC>
+The DCI Ref (VRP/VRN) Type pins
+
+These pins are typically used for the DDR termination references.
+In 7 series, the DCI comes in a VRP and VRN version.
+In Ultrascale, the DCI comes in only a VRP.
+<DOC>
+public defstruct DCIRefType <: SpecialFunction
+
+doc: \<DOC>
+ADC Function Type
+
+This special function flags a particular pin as supporting
+the onboard ADC. This may be applied to IO pins or
+Dedicated pins (ie, for VREF or for the power/gnd rails)
+<DOC>
+public defstruct ADCType <: SpecialFunction
+
+doc: \<DOC>
+Analog Voltage Reference
+
+This is a differential reference used by the ADC.
+<DOC>
+public defstruct AnalogRefType <: SpecialFunction & PolarizedType :
+  polarity:Diff-Polarity with: ( as-method => true )
+
+doc: \<DOC>
+Analog Input Special Function
+
+Some IO can be configured as inputs to the internal ADC.
+This tags those pins and provides the channel index and
+polarity flag for this IO pin.
+<DOC>
+public defstruct AnalogInputType <: SpecialFunction & IndexableType & PolarizedType :
+  index:Int with: (as-method => true)
+  polarity:Diff-Polarity with: (as-method => true)
+
+doc: \<DOC>
+Temperature Diode pins (DXP/DXN)
+<DOC>
+public defstruct TempDiodeType <: SpecialFunction & PolarizedType :
+  polarity:Diff-Polarity with: (as-method => true)
+
+doc: \<DOC>
+Power Rail pin function
+<DOC>
+public defstruct PowerRailType <: SpecialFunction :
+  bank:Maybe<Int>
+with:
+  constructor => #PowerRailType
+
+public defn PowerRailType (bank:Int = ?) -> PowerRailType :
+  #PowerRailType(bank)
+
+doc: \<DOC>
+Ground reference pin function
+<DOC>
+public defstruct GroundType <: SpecialFunction
+
+doc: \<DOC>
+Xilinx Device Pin Type
+
+Xilinx devices have multiple types of pins on the package
+and this is the root-type for all of those types of pins.
+
+Examples:
+1.  DedicatedPins - Often used for configuration
+2.  IO Pins - General Purpose IO, may be differential,
+    may be an analog input.
+3.  Power Pins - Multiple types:
+    1.  Internal Voltage Rails
+    2.  Bank Voltage Rails
+    3.  Ground Pins
+    4.  Analog Voltage Rails
+4.  Analog Pins -
+<DOC>
+public deftype XilinxPinType <: Equalable
+
+doc: \<DOC>
+Dedicated Pin Types for Xilinx Devices
+
+Dedicated pins are single function (or possibly, limited number of functions)
+pins.
+<DOC>
+public defstruct DedicatedPinType <: XilinxPinType :
+  doc: \<DOC>
+  Special Function[s] for this Dedicated pin
+  Most dedicated pins have single purpose. Some Ultrascale pins
+  are multifunction but they are all config pins that have slightly
+  different purpose depending on the configuration mode.
+  <DOC>
+  func:Tuple<SpecialFunction>
+with:
+  constructor => #DedicatedPinType
+  equalable => true
+  printer => true
+
+public defn DedicatedPinType (x:SpecialFunction|Tuple<SpecialFunction>) -> DedicatedPinType :
+  val objs = match(x):
+    (uno:SpecialFunction): [uno]
+    (v:Tuple<SpecialFunction>): v
+  #DedicatedPinType(objs)
+
+doc: \<DOC>
+
+<DOC>
+public defstruct IOPinType <: XilinxPinType :
+  doc: \<DOC>
+  IO Bank Identififer
+  This bank value gets parsed from the name of the pin so we
+  probably need to double check against the CSV row value
+  <DOC>
+  bank:Int
+  doc: \<DOC>
+  The channel is the index into a IO bank
+  <DOC>
+  channel:Int
+  doc: \<DOC>
+  There are many multi-function capabilities for IO.
+  @see Table 1-12 in UG475 for examples from the Xilinx 7 series
+  @see Table 1-5 in UG575 for examples from the Ultrascale series.
+  <DOC>
+  funcs:Tuple<SpecialFunction>
+with:
+  equalable => true
+  printer => true
+

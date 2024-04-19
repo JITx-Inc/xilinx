@@ -1,0 +1,2 @@
+defpackage xilinx/platforms/versal:
+  import core

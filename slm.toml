@@ -1,3 +1,4 @@
 name = "xilinx"
 version = "0.1.0"
 [dependencies]
+maybe-utils = { git = "StanzaOrg/maybe-utils", version = "0.1.4" }

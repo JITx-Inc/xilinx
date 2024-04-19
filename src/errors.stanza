@@ -1,0 +1,9 @@
+defpackage xilinx/errors:
+  import core
+
+
+public defstruct InvalidFunctionTypeError <: Exception:
+  msg:String
+
+public defmethod print (o:OutputStream, e:InvalidFunctionTypeError) :
+  print(o, "Invalid Function Type: %_" % [msg(e)])

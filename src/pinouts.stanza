@@ -60,6 +60,7 @@ public defn PinDescriptor (params:Tuple<KeyValue<String, String>>) -> PinDescrip
     get-by-key(params, HDR_SLR) $> to-maybe-int
   )
 
+
 public defstruct XilinxPinout <: Equalable & Hashable:
   device:String
   revision:String
