@@ -1,5 +1,6 @@
 defpackage xilinx/platforms/series-7:
   import core
+  import collections
   import maybe-utils
 
   import xilinx/pinouts
@@ -16,7 +17,11 @@ input special functions:
 <DOC>
 public deftype ClockInputType <: SpecialFunction
 public defstruct MultiRegionClockType <: ClockInputType
+with:
+  printer => true
 public defstruct SingleRegionClockType <: ClockInputType
+with:
+  printer => true
 
 
 doc: \<DOC>
@@ -27,19 +32,23 @@ interface that this pin supports.
 <DOC>
 public defstruct MemoryGroupType <: SpecialFunction & IndexableType :
   index:Int with: (as-method => true)
+with:
+  printer => true
 
 
 doc: \<DOC>
 Memory Strobe (DQS) Function Type
 <DOC>
 public defstruct MemoryStrobeType <: SpecialFunction
+with:
+  printer => true
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; High Performance Transceivers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-public defstruct SerialTransceiverType <: SpecialFunction
+public deftype SerialTransceiverType <: SpecialFunction
 
 public defenum GigabitClass:
   GTP
@@ -50,74 +59,139 @@ public defstruct TransceiverQuadType <: SerialTransceiverType & PolarizedType & 
   class:GigabitClass
   index:Int with: (as-method => true)
   polarity:Diff-Polarity with: (as-method => true)
+with:
+  printer => true
 
 public defstruct TransceiverClockType <: SerialTransceiverType & PolarizedType & IndexableType :
   index:Int with: (as-method => true)
   polarity:Diff-Polarity with: (as-method => true)
+with:
+  printer => true
 
 public defstruct TransceiverRefType <: SerialTransceiverType
+with:
+  printer => true
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Pin Name Parsing
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-defn parse-mode-pin (name:String) -> SpecialFunction|Tuple<SpecialFunction> :
-  ; @TODO parse the name string to extract the index.
-  val index = 0
-  ConfigModeType(index)
+defn parse-mode-pin (name:String, bank:Maybe<Int>) -> ConfigModeType :
+  if length(name) < 2 or name[0] != 'M' :
+    throw(Exception("Invalid mode pin name %_" % [name]))
+  match(to-int(name[1 to false])) :
+    (index:Int) : ConfigModeType(index)
+    (_) :
+      throw(Exception("Invalid mode pin name %_" % [name]))
 
-defn parse-bank-rail (name:String) -> SpecialFunction|Tuple<SpecialFunction> :
-  val bank = 0
-  PowerRailType(bank)
+defn parse-bank-rail (name:String, bank:Maybe<Int>) -> PowerRailType :
+  match(bank) :
+    (bank:One<Int>) : PowerRailType(value(bank))
+    (_) : PowerRailType(0)
 
-defn parse-serial-transceiver (name:String) -> SpecialFunction|Tuple<SpecialFunction> :
-  ; TODO - Parse one of:
-  ; TransceiverQuadType
-  ; TransceiverClockType
-  ; TransceiverRefType
-  ; PowerRailType
-  TransceiverRefType()
+defn parse-serial-transceiver (name:String, bank:Maybe<Int>) -> SerialTransceiverType|PowerRailType :
+  defn throw-invalid (msg:String|Printable) -> Void :
+    throw(Exception("Invalid serial transceiver pin name %_: %_" % [name, msg]))
+  if not prefix?(name, "MGT") :
+    throw-invalid("Prefix is not MGT*")
+  if length(name) < 4 :
+    throw-invalid("Too short")
 
-; Map of String : Function
+  defn parse-quad (class:GigabitClass) -> TransceiverQuadType :
+    val quad-name = name[4 to false]
+    if length(quad-name) != 4 :
+      throw-invalid("Bad quad name length")
+    val card-str = quad-name[0 to 2]
+    if card-str != "TX" and card-str != "RX" :
+      throw-invalid("Invalid quad cardinality %_" % [card-str])
+    val polarity = switch(quad-name[2]) :
+      'P' : Diff-P
+      'N': Diff-N
+      else : throw-invalid("Invalid quad polarity %_" % [quad-name[2]])
+    val index = match(to-int(to-string(quad-name[3]))) :
+      (index:Int) :
+        if index >= 0 and index < 4 :
+          index
+        else :
+          throw-invalid("Invalid quad index %_" % [index])
+      (_) :
+        throw-invalid("Missing quad index")
+    TransceiverQuadType(class, index, polarity)
+
+  defn parse-power () -> PowerRailType :
+    match(bank) :
+      (bank:One<Int>) : PowerRailType(value(bank))
+      (_) : PowerRailType(0)
+
+  defn parse-non-quad () -> SerialTransceiverType|PowerRailType :
+    val suffix = name[3 to false]
+    if any?({_ == suffix}, ["AVCC", "AVTT", "VCCAUX"]):
+      parse-power()
+    else if prefix?(suffix, "REFCLK") :
+      if length(suffix) != 8 :
+        throw-invalid("Invalid reference clock name")
+      val index = switch(suffix[6]) :
+        '0' : 0
+        '1' : 1
+        else : throw-invalid("Invalid reference clock index %_" % [suffix[6]])
+      val polarity = switch(suffix[7]) :
+        'P' : Diff-P
+        'N': Diff-N
+        else : throw-invalid("Invalid reference clock polarity %_" % [suffix[7]])
+      TransceiverClockType(index, polarity)
+    else if any?({_ == suffix}, ["RREF", "AVTTRCAL"]):
+      TransceiverRefType()
+    else :
+      throw-invalid("Could not parse transceiver pin type")
+
+  switch(name[3]) :
+    'P' :
+      parse-quad(GTP)
+    'X' :
+      parse-quad(GTX)
+    'H' :
+      parse-quad(GTH)
+    else :
+      parse-non-quad()
+
+; Map of String : (String,Maybe<Int>) -> DedicatedPinType
 ;  The string is the pin name that we will match against
 ;   with the bank ID (`_0` for bank 0) removed.
 ;   The string can include the `*` glob pattern string for
 ;   matching against a set of options.
-;  The function is called with the pin name as the
-;  argument.
-;  The function returns either a `SpecialFunction` or
-;  a `Tuple<SpecialFunction>`
+;  The function is called with the pin name and optional bank index as arguments
+;  The function returns either a `SpecialFunction` or `Tuple<SpecialFunction>`
 val dedicated-map = [
   ; Config
-  ["CCLK", {ConfigType()}],
-  ["DONE", {ConfigType()}],
-  ["INIT_B", {ConfigType()}],
-  ["PROGRAM_B", {ConfigType()}],
+  ["CCLK", fn (x, y) : ConfigType()],
+  ["DONE", fn (x, y) : ConfigType()],
+  ["INIT_B", fn (x, y) : ConfigType()],
+  ["PROGRAM_B", fn (x, y) : ConfigType()],
   ["M.", parse-mode-pin]
-  ["TCK", {JTAGType(TCK)}]
-  ["TDI", {JTAGType(TDI)}]
-  ["TDO", {JTAGType(TDO)}]
-  ["TMS", {JTAGType(TMS)}]
-  ["CFGBVS", {ConfigType()}]
+  ["TCK", fn (x, y) : JTAGType(TCK)]
+  ["TDI", fn (x, y) : JTAGType(TDI)]
+  ["TDO", fn (x, y) : JTAGType(TDO)]
+  ["TMS", fn (x, y) : JTAGType(TMS)]
+  ["CFGBVS", fn (x, y) : ConfigType()]
   ; Power
-  ["GND", {GroundType()}]
-  ["RSVDGND", {GroundType()}]
-  ["VCCAUX", {PowerRailType()}]
-  ["VCCAUX_IO_G.", {PowerRailType()}]
-  ["VCCINT", {PowerRailType()}]
-  ["VCCO_*", parse-bank-rail]
-  ["VCCBRAM", {PowerRailType()}]
-  ["VCCBATT", {PowerRailType()}]
+  ["GND", fn (x, y) : GroundType()]
+  ["RSVDGND", fn (x, y) : GroundType()]
+  ["VCCAUX", fn (x, y) : PowerRailType()]
+  ["VCCAUX_IO", fn (x, y) : PowerRailType()]
+  ["VCCINT", fn (x, y) : PowerRailType()]
+  ["VCCO", parse-bank-rail]
+  ["VCCBRAM", fn (x, y) : PowerRailType()]
+  ["VCCBATT", fn (x, y) : PowerRailType()]
   ; Analog
-  ["VCCADC", {[PowerRailType(), ADCType()]}]
-  ["GNDADC", {[PowerRailType(), ADCType()]}]
-  ["VP", {[ADCType(), AnalogInputType(16, Diff-P)]}]
-  ["VN", {[ADCType(), AnalogInputType(16, Diff-N)]}]
-  ["VREFP", {[ADCType(), AnalogRefType(Diff-P)]}]
-  ["VREFN", {[ADCType(), AnalogRefType(Diff-N)]}]
-  ["DXP", {TempDiodeType(Diff-P)}]
-  ["DXN", {TempDiodeType(Diff-N)}]
+  ["VCCADC", fn (x, y) : [PowerRailType(), ADCType()]]
+  ["GNDADC", fn (x, y) : [PowerRailType(), ADCType()]]
+  ["VP", fn (x, y) : [ADCType(), AnalogInputType(16, Diff-P)]]
+  ["VN", fn (x, y) : [ADCType(), AnalogInputType(16, Diff-N)]]
+  ["VREFP", fn (x, y) : [ADCType(), AnalogRefType(Diff-P)]]
+  ["VREFN", fn (x, y) : [ADCType(), AnalogRefType(Diff-N)]]
+  ["DXP", fn (x, y) : TempDiodeType(Diff-P)]
+  ["DXN", fn (x, y) : TempDiodeType(Diff-N)]
 
   ; Gigabit Serial Transceiver Pins
   ["MGT*", parse-serial-transceiver]
@@ -158,7 +232,7 @@ defn glob (v:String, pattern:String) -> True|False :
         MATCH+N:
           length(v) > length(pat-prefix)
 
-defn find-dedicated-transform (v:String) -> Maybe<[String, (String -> SpecialFunction|Tuple<SpecialFunction>)]> :
+defn find-dedicated-transform (v:String) -> Maybe<[String, ((String,Maybe<Int>) -> SpecialFunction|Tuple<SpecialFunction>)]> :
   for pair in dedicated-map first:
     val [pattern, func] = pair
     if glob(v, pattern):
@@ -210,7 +284,7 @@ defn extract-diff-pair (v:String) -> [Int, Maybe<Diff-Polarity>]:
         [num, None()]
 
 
-defn extract-io-pin (name:String, bank:Maybe<Int>) -> XilinxPinType :
+defn extract-io-pin (name:String, bank:Maybe<Int>) -> IOPinType :
   ; Pin names look like this:
   ; IO_L(\d+)(P|N)_T(\d+)_(([^_]+)_?)*
   ;
@@ -273,15 +347,22 @@ public defn parse (pd:PinDescriptor) -> XilinxPinType :
       println("Pin '%_' - Bank in CSV Absent - but Name has a Bank '%_'" % [n, value(x)])
     (x,y): false
 
-  val transform? = find-dedicated-transform(m-name)
-  match(transform?):
-    (x:One<[String, (String -> SpecialFunction|Tuple<SpecialFunction>)]>):
-      val [pattern, func] = value(x)
-      val spec-funcs = func(m-name)
-      DedicatedPinType(spec-funcs)
-    (_:None):
-      extract-io-pin(m-name, bank?)
+  defn parse-dedicated () -> Maybe<DedicatedPinType> :
+    match(find-dedicated-transform(m-name)):
+      (x:One<[String, ((String,Maybe<Int>) -> SpecialFunction|Tuple<SpecialFunction>)]>):
+        val [pattern, func] = value(x)
+        val spec-funcs = func(m-name, bank?)
+        One(DedicatedPinType(spec-funcs))
+      (_:None):
+        None()
 
+  defn parse-io () -> Maybe<IOPinType> :
+    if prefix?(m-name, "IO_") :
+      One(extract-io-pin(m-name, bank?))
+    else :
+      None()
 
-
-  ; If that fails - then we try parsing the IO pins style.
+  ;Try each parse strategy, return first successful result
+  match(first({_()}, [parse-dedicated, parse-io])) :
+    (type:One<XilinxPinType>) : value(type)
+    (_) : throw(Exception("Could not parse pin descriptor %_" % [pd]))

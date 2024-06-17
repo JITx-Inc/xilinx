@@ -62,8 +62,14 @@ public defmulti polarity (p:PolarizedType) -> Diff-Polarity
 public deftype CardinalityType <: SpecialFunction
 
 public defstruct InputType <: CardinalityType
+with:
+  printer => true
 public defstruct OutputType <: CardinalityType
+with:
+  printer => true
 public defstruct BidirType <: CardinalityType
+with:
+  printer => true
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Configuration Functions
@@ -79,6 +85,8 @@ The configuration functions are used to program the FPGA
 and configure the features at runtime.
 <DOC>
 public defstruct ConfigType <: SpecialFunction
+with:
+  printer => true
 
 public defenum ConfigBus:
   DataBus
@@ -93,6 +101,8 @@ address bus that are used in certain configuration modes.
 public defstruct ConfigBusType <: ConfigType & IndexableType :
   bus-type:ConfigBus
   index:Int with: (as-method => true)
+with:
+  printer => true
 
 doc: \<DOC>
 Configuration Mode Function Types
@@ -102,6 +112,8 @@ configuration.
 <DOC>
 public defstruct ConfigModeType <: ConfigType & IndexableType :
   index:Int with: (as-method => true)
+with:
+  printer => true
 
 
 public defenum JTAGBus:
@@ -115,12 +127,16 @@ JTAG Bus Interface Functions
 <DOC>
 public defstruct JTAGType <: ConfigType :
   signal:JTAGBus
+with:
+  printer => true
 
 doc: \<DOC>
 Revision Select Function Type
 <DOC>
 public defstruct RevisionType <: ConfigType & IndexableType :
   index:Int with: (as-method => true)
+with:
+  printer => true
 
 
 doc: \<DOC>
@@ -131,6 +147,8 @@ part of a differential pair.
 <DOC>
 public defstruct DifferentialIOType <: SpecialFunction & PolarizedType :
   polarity:Diff-Polarity with: ( as-method => true )
+with:
+  printer => true
 
 doc: \<DOC>
 Per Bank VREF pin
@@ -139,6 +157,8 @@ Some devices use a dedicated pin (ultrascale) and others
 have a multi-function (7 series)
 <DOC>
 public defstruct VREFType <: SpecialFunction
+with:
+  printer => true
 
 doc: \<DOC>
 The DCI Ref (VRP/VRN) Type pins
@@ -148,6 +168,8 @@ In 7 series, the DCI comes in a VRP and VRN version.
 In Ultrascale, the DCI comes in only a VRP.
 <DOC>
 public defstruct DCIRefType <: SpecialFunction
+with:
+  printer => true
 
 doc: \<DOC>
 ADC Function Type
@@ -157,6 +179,8 @@ the onboard ADC. This may be applied to IO pins or
 Dedicated pins (ie, for VREF or for the power/gnd rails)
 <DOC>
 public defstruct ADCType <: SpecialFunction
+with:
+  printer => true
 
 doc: \<DOC>
 Analog Voltage Reference
@@ -165,6 +189,8 @@ This is a differential reference used by the ADC.
 <DOC>
 public defstruct AnalogRefType <: SpecialFunction & PolarizedType :
   polarity:Diff-Polarity with: ( as-method => true )
+with:
+  printer => true
 
 doc: \<DOC>
 Analog Input Special Function
@@ -176,12 +202,16 @@ polarity flag for this IO pin.
 public defstruct AnalogInputType <: SpecialFunction & IndexableType & PolarizedType :
   index:Int with: (as-method => true)
   polarity:Diff-Polarity with: (as-method => true)
+with:
+  printer => true
 
 doc: \<DOC>
 Temperature Diode pins (DXP/DXN)
 <DOC>
 public defstruct TempDiodeType <: SpecialFunction & PolarizedType :
   polarity:Diff-Polarity with: (as-method => true)
+with:
+  printer => true
 
 doc: \<DOC>
 Power Rail pin function
@@ -190,6 +220,7 @@ public defstruct PowerRailType <: SpecialFunction :
   bank:Maybe<Int>
 with:
   constructor => #PowerRailType
+  printer => true
 
 public defn PowerRailType (bank:Int = ?) -> PowerRailType :
   #PowerRailType(bank)
@@ -198,6 +229,8 @@ doc: \<DOC>
 Ground reference pin function
 <DOC>
 public defstruct GroundType <: SpecialFunction
+with:
+  printer => true
 
 doc: \<DOC>
 Xilinx Device Pin Type
@@ -266,4 +299,3 @@ public defstruct IOPinType <: XilinxPinType :
 with:
   equalable => true
   printer => true
-
