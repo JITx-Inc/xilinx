@@ -86,9 +86,7 @@ defn parse-mode-pin (name:String, bank:Maybe<Int>) -> ConfigModeType :
       throw(Exception("Invalid mode pin name %_" % [name]))
 
 defn parse-bank-rail (name:String, bank:Maybe<Int>) -> PowerRailType :
-  match(bank) :
-    (bank:One<Int>) : PowerRailType(value(bank))
-    (_) : PowerRailType(0)
+  PowerRailType(bank)
 
 defn parse-serial-transceiver (name:String, bank:Maybe<Int>) -> SerialTransceiverType|PowerRailType :
   defn throw-invalid (msg:String|Printable) -> Void :
@@ -119,15 +117,10 @@ defn parse-serial-transceiver (name:String, bank:Maybe<Int>) -> SerialTransceive
         throw-invalid("Missing quad index")
     TransceiverQuadType(class, index, polarity)
 
-  defn parse-power () -> PowerRailType :
-    match(bank) :
-      (bank:One<Int>) : PowerRailType(value(bank))
-      (_) : PowerRailType(0)
-
   defn parse-non-quad () -> SerialTransceiverType|PowerRailType :
     val suffix = name[3 to false]
     if any?({_ == suffix}, ["AVCC", "AVTT", "VCCAUX"]):
-      parse-power()
+      PowerRailType(bank)
     else if prefix?(suffix, "REFCLK") :
       if length(suffix) != 8 :
         throw-invalid("Invalid reference clock name")
@@ -325,15 +318,14 @@ Parse a Pin Descriptor into a XilinxPinType
 This Constructs the PinIR for a Pin Descriptor object.
 <DOC>
 public defn parse (pd:PinDescriptor) -> XilinxPinType :
-
   val n = name(pd)
-
-  val bank-suffix? = split-on-bank(n)
-  val [m-name, bank?] = match(bank-suffix?):
+  val [m-name, bank?] = match(split-on-bank(n)):
     (_:None): [n, None()]
     (o:One<[String, String]>):
       val comps = value(o)
-      [comps[0], to-maybe $ to-int(comps[1])]
+      val m-name = comps[0]
+      val bank? = to-maybe(to-int(comps[1]))
+      [m-name, bank?]
 
   ; Do some sanity checking and logs
   ;  some strange conditions.

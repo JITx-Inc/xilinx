@@ -219,11 +219,10 @@ Power Rail pin function
 public defstruct PowerRailType <: SpecialFunction :
   bank:Maybe<Int>
 with:
-  constructor => #PowerRailType
   printer => true
 
 public defn PowerRailType (bank:Int = ?) -> PowerRailType :
-  #PowerRailType(bank)
+  PowerRailType(bank)
 
 doc: \<DOC>
 Ground reference pin function
