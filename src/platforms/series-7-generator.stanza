@@ -1,0 +1,85 @@
+defpackage xilinx/platforms/series-7-generator :
+  import core
+  import collections
+  import maybe-utils
+
+  import xilinx/pinouts
+  import xilinx/pin-ir
+  import xilinx/platforms/series-7
+
+val SIMPLE-TMPLT = \<s>
+pcb-component %_ :
+  pin-properties :
+    [pin:Ref | pads:Int ... | bank:Int|False ]
+%_
+<s>
+
+defn make-pin-row (pin-entry:KeyValue<String,List<PinDescriptor>>) -> String :
+  val name = key(pin-entry)
+  val pads = value(pin-entry)
+  if empty?(pads) :
+    throw(Exception("No pads found in entry for pin %_" % [name]))
+  val pad-indices = to-vector<Int>(seq({pin-ref-to-index(pin-ref(_))}, pads))
+  qsort!(pad-indices)
+  val bank = match(bank(head(pads))) :
+    (bank:One<Int>) : value(bank)
+    (_) : false
+  val template = "    [%_ | %_ | %_]"
+  to-string $ template % [name, string-join(pad-indices, ", "), bank]
+
+defn simple-component (name:String, pinout:XilinxPinout) -> String :
+  val pin-table = HashTable<String,List<PinDescriptor>>()
+  for pd in pins(pinout) do :
+    val name = /name(pd)
+    val old-list = get?(pin-table, name, List() as List<PinDescriptor>)
+    pin-table[name] = cons(pd, old-list)
+  val pin-entries = to-vector<KeyValue<String,List<PinDescriptor>>>(pin-table)
+  qsort!(key, pin-entries)
+  val row-strs = to-tuple $ seq(make-pin-row, pin-entries)
+  to-string $ SIMPLE-TMPLT % [name, string-join(row-strs, "\n")]
+
+val NUM-COLS = 34
+val NUM-ROWS = 34
+defn pin-ref-to-index (pin-ref:String) -> Int :
+  defn throw-invalid (msg:String|Printable) :
+    throw(Exception("Invalid pin ref %_: %_" % [pin-ref, msg]))
+  if length(pin-ref) < 2 or length(pin-ref) > 4 :
+    throw-invalid("bad length")
+  val split-index = match(index-when(digit?, pin-ref)) :
+    (i:Int) :
+      if i <= 0 :
+        throw-invalid("no row")
+      i
+    (_) :
+      throw-invalid("no column")
+  val row-str = pin-ref[0 to split-index]
+  val col-str = pin-ref[split-index to false]
+  val col = match(to-int(col-str)) :
+    (col:Int) :
+      if col <= 0 or col > NUM-COLS :
+        throw-invalid("invalid column number %_" % [col])
+      col
+    (_) :
+      throw-invalid("could not parse column number: %_" % [col-str])
+  val row = row-name-to-index(row-str)
+  if row <= 0 or row > NUM-ROWS :
+    throw-invalid("invalid row number %_" % [col])
+  (row - 1) * NUM-COLS + col
+
+val EXCLUDED-ROW-CHARS = ['I', 'O', 'Q', 'S', 'X', 'Z']
+defn row-name-to-index (row-name:String) -> Int :
+  defn row-char-to-index (c:Char) -> Int :
+    if c < 'A' or c > 'Z' :
+      throw(Exception("Invalid character in row index: %_" % [c]))
+    val offset = with-default{_, 6} $ for e in EXCLUDED-ROW-CHARS index-when :
+      if c == e :
+        throw(Exception("Invalid character in row index: %_" % [c]))
+      c < e
+    to-int(c) - to-int('A') - offset + 1
+  val base = 26 - length(EXCLUDED-ROW-CHARS)
+  reduce({base * _0 + _1}, 0, seq(row-char-to-index, row-name))
+
+defn with-default<?T> (x:?T|False, default:?T) -> T :
+  match(x) :
+    (x:T) : x
+    (_) : default
