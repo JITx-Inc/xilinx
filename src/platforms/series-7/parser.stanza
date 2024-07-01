@@ -34,9 +34,10 @@ defn parse-serial-transceiver (name:String, bank:Maybe<Int>) -> SerialTransceive
     val quad-name = name[4 to false]
     if length(quad-name) != 4 :
       throw-invalid("Bad quad name length")
-    val card-str = quad-name[0 to 2]
-    if card-str != "TX" and card-str != "RX" :
-      throw-invalid("Invalid quad cardinality %_" % [card-str])
+    val direction = switch(quad-name[0 to 2]) :
+      "TX" : GTTX
+      "RX" : GTRX
+      else : throw-invalid("Invalid quad cardinality %_" % [quad-name[0 to 2]])
     val polarity = switch(quad-name[2]) :
       'P' : Diff-P
       'N': Diff-N
@@ -49,11 +50,11 @@ defn parse-serial-transceiver (name:String, bank:Maybe<Int>) -> SerialTransceive
           throw-invalid("Invalid quad index %_" % [index])
       (_) :
         throw-invalid("Missing quad index")
-    TransceiverQuadType(class, index, polarity)
+    TransceiverQuadType(class, index, direction, polarity)
 
   defn parse-non-quad () -> SerialTransceiverType|PowerRailType :
     val suffix = name[3 to false]
-    if any?({_ == suffix}, ["AVCC", "AVTT", "VCCAUX"]):
+    if any?({prefix?(suffix, _)}, ["AVCC", "AVTT", "VCCAUX"]):
       PowerRailType(bank)
     else if prefix?(suffix, "REFCLK") :
       if length(suffix) != 8 :
@@ -105,7 +106,7 @@ val dedicated-map = [
   ["GND", fn (x, y) : GroundType()]
   ["RSVDGND", fn (x, y) : GroundType()]
   ["VCCAUX", fn (x, y) : PowerRailType()]
-  ["VCCAUX_IO", fn (x, y) : PowerRailType()]
+  ["VCCAUX_IO*", fn (x, y) : PowerRailType()]
   ["VCCINT", fn (x, y) : PowerRailType()]
   ["VCCO", parse-bank-rail]
   ["VCCBRAM", fn (x, y) : PowerRailType()]
@@ -177,12 +178,14 @@ High Speed IO hav a `_G0` or `_G1` suffix.
 
 Power pins may not have any suffix, like `GND` or `VCCINT`
 <DOC>
-defn split-on-bank (name:String) -> Maybe<[String, String]>:
-  val index = last-index-of-char(name, '_')
-  match(index):
-    (_:False): None()
-    (v:Int):
-      One $ [name[0 to v], name[ (v + 1) to length(name)]]
+defn split-on-bank (name:String) -> [String,Maybe<Int>] :
+  match(last-index-of-char(name, '_')) :
+    (i:Int) :
+      val bank-str = name[(i + 1) to false]
+      match(to-int(bank-str)) :
+        (bank:Int) : [name[0 to i], One(bank)]
+        (_) : [name, None()]
+    (_) : [name, None()]
 
 defn extract-diff-pair (v:String) -> [Int, Maybe<Diff-Polarity>]:
   if length(v) == 0:
@@ -253,13 +256,7 @@ This Constructs the PinIR for a Pin Descriptor object.
 <DOC>
 public defn parse (pd:PinDescriptor) -> XilinxPinType :
   val n = name(pd)
-  val [m-name, bank?] = match(split-on-bank(n)):
-    (_:None): [n, None()]
-    (o:One<[String, String]>):
-      val comps = value(o)
-      val m-name = comps[0]
-      val bank? = to-maybe(to-int(comps[1]))
-      [m-name, bank?]
+  val [m-name, bank?] = split-on-bank(n)
 
   ; Do some sanity checking and logs
   ;  some strange conditions.

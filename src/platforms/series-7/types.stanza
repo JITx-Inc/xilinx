@@ -53,9 +53,14 @@ public defenum GigabitClass:
   GTX
   GTH
 
+public defenum GigabitDirection:
+  GTTX
+  GTRX
+
 public defstruct TransceiverQuadType <: SerialTransceiverType & PolarizedType & IndexableType :
   class:GigabitClass
   index:Int with: (as-method => true)
+  direction:GigabitDirection
   polarity:Diff-Polarity with: (as-method => true)
 with:
   printer => true
