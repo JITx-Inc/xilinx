@@ -37,10 +37,15 @@ defn XilinxPin (pd:PinDescriptor) -> XilinxPin :
 ;============================================================
 
 val SIMPLE-TMPLT = \<s>
+pcb-bundle virtex-7-io-bank :
+  port S : pin[[0 25]]
+  port D : diff-pair[[1 through 24]]
+
 pcb-component %_ :
-  port io: virtex-7-io-bank[[ %_ ]]
+  port IO: virtex-7-io-bank[[ %_ ]]
   pin-properties :
     [pin:Ref | pads:Ref ... | bank:Int ]
+%_
 %_
 <s>
 
@@ -52,11 +57,11 @@ defn simple-component (name:String, pinout:XilinxPinout) -> String :
       (p:IOXilinxPin) : add(io-pins, p)
       (p:DedicatedXilinxPin) : add(dedicated-pins, p)
 
-  ;TODO: dedicated pin parsing
+  val dedicated-props = make-dedicated-pin-properties(dedicated-pins)
 
   val [io-bank-ids-str, io-props] = make-io-pin-properties(io-pins)
 
-  to-string $ SIMPLE-TMPLT % [name, io-bank-ids-str, io-props]
+  to-string $ SIMPLE-TMPLT % [name, io-bank-ids-str, dedicated-props, io-props]
 
 ;============================================================
 ;========================= Helpers ==========================
@@ -64,8 +69,30 @@ defn simple-component (name:String, pinout:XilinxPinout) -> String :
 
 ;Converts dedicated pins into rows for the pin properties table
 defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> String :
-  ;TODO: dedicated pin parsing
-  ""
+  ;Groups of dedicated pins by pin name
+  ;Use a vector to preserve input order
+  val groups = Vector<Vector<DedicatedXilinxPin>>()
+  ;Index into the groups vector by pin name
+  val group-index-by-name = HashTable<String,Int>()
+
+  ;Fill groups
+  for p in pins do :
+    match(get?(group-index-by-name, name(p))) :
+      (i:Int) :
+        add(groups[i], p)
+      (_) :
+        val group = Vector<DedicatedXilinxPin>()
+        add(group, p)
+        group-index-by-name[name(p)] = length(groups)
+        add(groups, group)
+
+  ;Build properties for each row
+  val rows = for g in groups seq :
+    val name = /name(g[0])
+    val bank = with-default(/bank(g[0]), 0)
+    val pins = qsort $ seq(pin-ref, g)
+    to-string $ "    [%_ | %_ | %_]" % [name, string-join(pins, " "), bank]
+  string-join(rows, "\n")
 
 defn make-io-pin-properties (pins:Vector<IOXilinxPin>) -> [String,String] :
   val banks = IntTable<Vector<IOXilinxPin>>()
@@ -92,14 +119,14 @@ defn make-io-pin-properties (pins:Vector<IOXilinxPin>) -> [String,String] :
         val i = (2 * cid - 1) when diff-pol is Diff-P else (2 * cid)
         pins-in-order[i] = p
 
-    val row-0 = to-string $ "    [ io[%_].s[0] | %_ | %_ ]" % [bid, pin-ref(pins-in-order[0]), bid]
-    val row-25 = to-string $ "    [ io[%_].s[25] | %_ | %_ ]" % [bid, pin-ref(pins-in-order[49]), bid]
+    val row-0 = to-string $ "    [ IO[%_].S[0] | %_ | %_ ]" % [bid, pin-ref(pins-in-order[0]), bid]
+    val row-25 = to-string $ "    [ IO[%_].S[25] | %_ | %_ ]" % [bid, pin-ref(pins-in-order[49]), bid]
     val diff-pair-rows = for cid in 1 through 24 seq-cat :
       val pin-P = pins-in-order[2 * cid - 1]
       val pin-N = pins-in-order[2 * cid]
       [
-      to-string $ "    [ io[%_].d[%_].P | %_ | %_ ]" % [bid, cid, pin-ref(pin-P), bid]
-      to-string $ "    [ io[%_].d[%_].N | %_ | %_ ]" % [bid, cid, pin-ref(pin-N), bid]
+      to-string $ "    [ IO[%_].D[%_].P | %_ | %_ ]" % [bid, cid, pin-ref(pin-P), bid]
+      to-string $ "    [ IO[%_].D[%_].N | %_ | %_ ]" % [bid, cid, pin-ref(pin-N), bid]
       ]
     cat-all([[row-0], diff-pair-rows, [row-25]])
   val pin-prop-str = string-join(rows, "\n")
@@ -111,15 +138,16 @@ defn make-io-pin-properties (pins:Vector<IOXilinxPin>) -> [String,String] :
 ;======================== Utilities =========================
 ;============================================================
 
-defn with-default<?T> (x:?T|False, default:?T) -> T :
-  match(x) :
-    (x:T) : x
-    (_) : default
+defn strip-bank (name:String) -> String :
+  name[0 to last-index-of-char(name, '_')]
 
-defn with-default<?T> (x:Maybe<?T>, default:?T) -> T :
+defmulti with-default<?T> (x:?T|False, default:?T) -> T
+defmethod with-default<?T> (x:False, default:?T) -> T : default
+defmethod with-default<?T> (x:Maybe<?T>, default:?T) -> T :
   match(x) :
     (x:One<T>) : value(x)
     (_) : default
+defmethod with-default<?T> (x:?T, default:?T) -> T : x
 
 ;============================================================
 
