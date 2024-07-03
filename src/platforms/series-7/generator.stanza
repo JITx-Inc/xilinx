@@ -38,7 +38,7 @@ defstruct PinProperties :
   pads:Tuple<String>
   bank:Int
 defmethod print (o:OutputStream, p:PinProperties) -> False :
-  print(o, "[%_ | %* | %_]" % [name(p), join(pads(p), " "), bank(p)])
+  print(o, "[ %_ | %* | %_ ]" % [name(p), join(pads(p), " "), bank(p)])
 
 defstruct PortDeclaration :
   name:String
@@ -51,13 +51,18 @@ defmethod print (o:OutputStream, p:PortDeclaration) -> False :
 ;======================== Generator =========================
 ;============================================================
 
-val SIMPLE-TMPLT = \<s>
-pcb-bundle virtex-7-gt-quad :
-  port C : virtex-7-gt-channel[[0 to 4]]
+val SIMPLE-TMPLT =
+\<s>#use-added-syntax(jitx)
+defpackage components/%_ :
+  import core
+  import collections
+  import jitx
+  import jitx/commands
+  import ocdb/utils/box-symbol
+  import jsl/bundles
 
-pcb-bundle virtex-7-gt-channel :
-  port TX : diff-pair
-  port RX : diff-pair
+pcb-bundle virtex-7-gt-quad :
+  port C : lane-pair[[0 to 4]]
 
 pcb-bundle virtex-7-io-bank :
   port S: pin[[0 25]]
@@ -86,7 +91,7 @@ defn simple-component (name:String, landpattern-name:String, pinout:XilinxPinout
 
   val [io-ports, io-props] = make-io-pin-properties(io-pins)
 
-  to-string $ SIMPLE-TMPLT % [name, join(cat(dd-ports, io-ports), "\n  "),
+  to-string $ SIMPLE-TMPLT % [name, name, join(cat(dd-ports, io-ports), "\n  "),
     join(cat(dd-props, io-props), "\n    "), landpattern-name]
 
 ;============================================================
@@ -116,13 +121,21 @@ defn group-by-name (pins:Seqable<DedicatedXilinxPin>) -> Vector<DedicatedXilinxP
 
 ;Converts dedicated pins into rows for the pin properties table
 defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> [Tuple<PortDeclaration>,Tuple<PinProperties>] :
+  val vcco-banks = IntSet()
   val gtp-banks = IntSet()
   val gtx-banks = IntSet()
   val gth-banks = IntSet()
 
   ;Build properties for each pin
   val props = to-tuple $ for p in pins seq :
-    if any?({prefix?(name(p), _)}, ["MGTP", "MGTX", "MGTH"]) :
+    if prefix?(name(p), "VCCO") :
+      val bank = match(bank(p)) :
+        (b:One<Int>) : value(b)
+        (_) : throw(Exception("Power supply pin %_ has no bank" % [name(p)]))
+      add(vcco-banks, bank)
+      val name = to-string $ "VCCO[%_]" % [bank]
+      PinProperties(name, pin-refs(p), bank)
+    else if any?({prefix?(name(p), _)}, ["MGTP", "MGTX", "MGTH"]) :
       val tqt = match(find({_ is TransceiverQuadType}, funcs(p))) :
         (tqt:TransceiverQuadType) : tqt
         (_) : throw(Exception("No transceiver quad type function found for pin %_" % [name(p)]))
@@ -144,14 +157,19 @@ defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> [Tuple<P
       val pin-name = to-string $ "%_[%_].C[%_].%_.%_" % [class-str, bank, index(tqt), dir-str, pol-str]
       PinProperties(pin-name, pin-refs(p), bank)
     else :
-      PinProperties(name(p), pin-refs(p), maybe-default(bank(p), 0))
+      val bank = maybe-default(/bank(p), 0)
+      val name = if bank == 0 and suffix?(name(p), "_0") :
+        name(p)[0 to (length(name(p)) - 2)]
+      else : name(p)
+      PinProperties(name, pin-refs(p), bank)
 
-  val port-decls = to-tuple $ for (name in ["MGTP", "MGTX", "MGTH"], banks in [gtx-banks, gtp-banks, gth-banks]) seq? :
+  val vcco-decl = PortDeclaration("VCCO", "pin", qsort(vcco-banks))
+  val gt-decls = for (name in ["MGTP", "MGTX", "MGTH"], banks in [gtp-banks, gtx-banks, gth-banks]) seq? :
     if length(banks) > 0 :
-      One(PortDeclaration(name, "virtex-7-serial-quad", qsort(banks)))
+      One(PortDeclaration(name, "virtex-7-gt-quad", qsort(banks)))
     else :
       None()
-
+  val port-decls = to-tuple $ cat-all $ [[vcco-decl], gt-decls]
   [port-decls, props]
 
 ;Converts IO pins into rows for the pin properties table
@@ -170,7 +188,7 @@ defn make-io-pin-properties (pins:Vector<IOXilinxPin>) -> [Tuple<PortDeclaration
       if channel(p) == 0 :
         PinProperties(to-string("IO[%_].S[0]" % [bid]), [pin-ref(p)], bid)
       else if channel(p) == 25 :
-        PinProperties(to-string("IO[%_].S[0]" % [bid]), [pin-ref(p)], bid)
+        PinProperties(to-string("IO[%_].S[25]" % [bid]), [pin-ref(p)], bid)
       else :
         val cid = channel(p)
         val diff-pol = match(find({_ is DifferentialIOType}, funcs(p))) :
