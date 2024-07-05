@@ -54,7 +54,9 @@ defn parse-serial-transceiver (name:String, bank:Maybe<Int>) -> SerialTransceive
 
   defn parse-non-quad () -> SerialTransceiverType|PowerRailType :
     val suffix = name[3 to false]
-    if any?({prefix?(suffix, _)}, ["AVCC", "AVTT", "VCCAUX"]):
+    if any?({_ == suffix}, ["RREF", "AVTTRCAL"]):
+      TransceiverRefType()
+    else if any?({prefix?(suffix, _)}, ["AVCC", "AVTT", "VCCAUX"]):
       PowerRailType(bank)
     else if prefix?(suffix, "REFCLK") :
       if length(suffix) != 8 :
@@ -68,8 +70,6 @@ defn parse-serial-transceiver (name:String, bank:Maybe<Int>) -> SerialTransceive
         'N': Diff-N
         else : throw-invalid("Invalid reference clock polarity %_" % [suffix[7]])
       TransceiverClockType(index, polarity)
-    else if any?({_ == suffix}, ["RREF", "AVTTRCAL"]):
-      TransceiverRefType()
     else :
       throw-invalid("Could not parse transceiver pin type")
 
