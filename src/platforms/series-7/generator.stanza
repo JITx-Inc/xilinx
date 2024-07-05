@@ -14,13 +14,13 @@ defpackage xilinx/platforms/series-7/generator :
 
 deftype XilinxPin
 defstruct DedicatedXilinxPin <: XilinxPin :
-  pin-refs:Tuple<String> with:
+  pin-refs:Tuple<PadRef> with:
     updater => sub-pin-refs
   name:String
   bank:Maybe<Int>
   funcs:Tuple<SpecialFunction>
 defstruct IOXilinxPin <: XilinxPin :
-  pin-ref:String
+  pin-ref:PadRef
   name:String
   bank:Int
   channel:Int
@@ -29,13 +29,35 @@ defstruct IOXilinxPin <: XilinxPin :
 defn XilinxPin (pd:PinDescriptor) -> XilinxPin :
   match(parse(pd)) :
     (pt:DedicatedPinType) :
-      DedicatedXilinxPin([pin-ref(pd)], name(pd), bank(pd), func(pt))
+      DedicatedXilinxPin([PadRef(pin-ref(pd))], name(pd), bank(pd), func(pt))
     (pt:IOPinType) :
-      IOXilinxPin(pin-ref(pd), name(pd), bank(pt), channel(pt), funcs(pt))
+      IOXilinxPin(PadRef(pin-ref(pd)), name(pd), bank(pt), channel(pt), funcs(pt))
+
+defstruct PadRef <: Equalable&Comparable<PadRef>&Hashable :
+  row:String
+  col:Int
+with:
+  equalable => true
+  hashable => true
+defmethod compare (a:PadRef, b:PadRef) -> Int :
+  compare([length(row(a)), row(a), col(a)], [length(row(b)), row(b), col(b)])
+defmethod print (o:OutputStream, p:PadRef) -> False :
+  print(o, "%_%_" % [row(p), col(p)])
+defn PadRef (ref-str:String) -> PadRef :
+  defn throw-invalid () -> Void :
+    throw(Exception("Invalid pad reference %_" % [ref-str]))
+  val split = match(index-when(digit?, ref-str)) :
+    (i:Int) : throw-invalid() when i < 1 else i
+    (_) : throw-invalid()
+  val row = ref-str[0 to split]
+  val col = match(to-int(ref-str[split to false])) :
+    (i:Int) : i
+    (_) : throw-invalid()
+  PadRef(row, col)
 
 defstruct PinProperties :
   name:String
-  pads:Tuple<String>
+  pads:Tuple<PadRef>
   bank:Int
 defmethod print (o:OutputStream, p:PinProperties) -> False :
   print(o, "[ %_ | %* | %_ ]" % [name(p), join(pads(p), " "), bank(p)])
@@ -43,9 +65,10 @@ defmethod print (o:OutputStream, p:PinProperties) -> False :
 defstruct PortDeclaration :
   name:String
   type:String
-  indices:Tuple<Int>
+  indices:Tuple<Int|Range>
 defmethod print (o:OutputStream, p:PortDeclaration) -> False :
-  print(o, "port %_: %_[[ %* ]]" % [name(p), type(p), join(indices(p), " ")])
+  val index-arr-str = ("[[ %* ]]" % [join(indices(p), " ")]) when (length(indices(p)) > 0) else ""
+  print(o, "port %_: %_%_" % [name(p), type(p), index-arr-str])
 
 ;============================================================
 ;======================== Generator =========================
@@ -58,8 +81,12 @@ defpackage components/%_ :
   import collections
   import jitx
   import jitx/commands
-  import ocdb/utils/box-symbol
   import jsl/bundles
+  import jsl/bundles/debug
+  import ocdb/utils/box-symbol
+
+pcb-bundle virtex-7-gt-clock :
+  port I : diff-pair[[0 to 2]]
 
 pcb-bundle virtex-7-gt-quad :
   port C : lane-pair[[0 to 4]]
@@ -121,30 +148,66 @@ defn group-by-name (pins:Seqable<DedicatedXilinxPin>) -> Vector<DedicatedXilinxP
 
 ;Converts dedicated pins into rows for the pin properties table
 defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> [Tuple<PortDeclaration>,Tuple<PinProperties>] :
+  ;TODO: create a generalized framework for building and declaring bundles
+  val port-decls = Vector<PortDeclaration>()
+  ;Config mode pins
+  add(port-decls, PortDeclaration("M", "pin", [0 to 3]))
+  ;JTAG
+  add(port-decls, PortDeclaration("JTAG", "jtag", []))
+  ;Multi-bank ports
   val vcco-banks = IntSet()
+  val gtclock-banks = IntSet()
   val gtp-banks = IntSet()
   val gtx-banks = IntSet()
   val gth-banks = IntSet()
+  val gtavttrcal-banks = IntSet()
+
+  defn default-pin-properties (p:DedicatedXilinxPin) -> PinProperties :
+    val bank = maybe-default(/bank(p), 0)
+    val name = if bank == 0 and suffix?(name(p), "_0") :
+      name(p)[0 to (length(name(p)) - 2)]
+    else : name(p)
+    PinProperties(name, pin-refs(p), bank)
 
   ;Build properties for each pin
-  val props = to-tuple $ for p in pins seq :
-    if prefix?(name(p), "VCCO") :
+  val props = to-tuple $ for p in pins seq : match(funcs(p)[0]) :
+    (type:ConfigModeType) :
+      PinProperties(to-string("M%_" % [index(type)]), pin-refs(p), 0)
+
+    (type:PowerRailType) :
+      if prefix?(name(p), "VCCO") :
+        val bank = match(bank(p)) :
+          (b:One<Int>) : value(b)
+          (_) : throw(Exception("Power supply pin %_ has no bank" % [name(p)]))
+        add(vcco-banks, bank)
+        val name = to-string $ "VCCO[%_]" % [bank]
+        PinProperties(name, pin-refs(p), bank)
+      else :
+        default-pin-properties(p)
+
+    (type:JTAGType) :
+      switch(signal(type)) :
+        TCK : PinProperties("JTAG.TCK", pin-refs(p), 0)
+        TMS : PinProperties("JTAG.TMS", pin-refs(p), 0)
+        TDI : PinProperties("JTAG.TDI", pin-refs(p), 0)
+        TDO : PinProperties("JTAG.TDO", pin-refs(p), 0)
+
+    (type:TransceiverClockType) :
       val bank = match(bank(p)) :
         (b:One<Int>) : value(b)
-        (_) : throw(Exception("Power supply pin %_ has no bank" % [name(p)]))
-      add(vcco-banks, bank)
-      val name = to-string $ "VCCO[%_]" % [bank]
-      PinProperties(name, pin-refs(p), bank)
-    else if any?({prefix?(name(p), _)}, ["MGTP", "MGTX", "MGTH"]) :
-      val tqt = match(find({_ is TransceiverQuadType}, funcs(p))) :
-        (tqt:TransceiverQuadType) : tqt
-        (_) : throw(Exception("No transceiver quad type function found for pin %_" % [name(p)]))
+        (_) : throw(Exception("Transceiver clock pin %_ has no bank" % [name(p)]))
+      add(gtclock-banks, bank)
+      val pol-str = "P" when polarity(type) is Diff-P else "N"
+      val pin-name = to-string $ "MGTREFCLK[%_].I[%_].%_" % [bank, index(type), pol-str]
+      PinProperties(pin-name, pin-refs(p), bank)
+
+    (type:TransceiverQuadType) :
       val bank = match(bank(p)) :
         (b:One<Int>) : value(b)
         (_) : throw(Exception("Transceiver pin %_ has no bank" % [name(p)]))
-      val dir-str = "TX" when direction(tqt) is GTTX else "RX"
-      val pol-str = "P" when polarity(tqt) is Diff-P else "N"
-      val class-str = switch(class(tqt)) :
+      val dir-str = "TX" when direction(type) is GTTX else "RX"
+      val pol-str = "P" when polarity(type) is Diff-P else "N"
+      val class-str = switch(class(type)) :
         GTP :
           add(gtp-banks, bank)
           "MGTP"
@@ -154,23 +217,19 @@ defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> [Tuple<P
         GTH :
           add(gth-banks, bank)
           "MGTH"
-      val pin-name = to-string $ "%_[%_].C[%_].%_.%_" % [class-str, bank, index(tqt), dir-str, pol-str]
+      val pin-name = to-string $ "%_[%_].C[%_].%_.%_" % [class-str, bank, index(type), dir-str, pol-str]
       PinProperties(pin-name, pin-refs(p), bank)
-    else :
-      val bank = maybe-default(/bank(p), 0)
-      val name = if bank == 0 and suffix?(name(p), "_0") :
-        name(p)[0 to (length(name(p)) - 2)]
-      else : name(p)
-      PinProperties(name, pin-refs(p), bank)
 
-  val vcco-decl = PortDeclaration("VCCO", "pin", qsort(vcco-banks))
-  val gt-decls = for (name in ["MGTP", "MGTX", "MGTH"], banks in [gtp-banks, gtx-banks, gth-banks]) seq? :
+    (_) :
+      default-pin-properties(p)
+
+  add(port-decls, PortDeclaration("VCCO", "pin", qsort(vcco-banks)))
+  if length(gtclock-banks) > 0 :
+    add(port-decls, PortDeclaration("MGTREFCLK", "virtex-7-gt-clock", qsort(gtclock-banks)))
+  for (name in ["MGTP", "MGTX", "MGTH"], banks in [gtp-banks, gtx-banks, gth-banks]) do :
     if length(banks) > 0 :
-      One(PortDeclaration(name, "virtex-7-gt-quad", qsort(banks)))
-    else :
-      None()
-  val port-decls = to-tuple $ cat-all $ [[vcco-decl], gt-decls]
-  [port-decls, props]
+      add(port-decls, PortDeclaration(name, "virtex-7-gt-quad", qsort(banks)))
+  [to-tuple(port-decls), props]
 
 ;Converts IO pins into rows for the pin properties table
 defn make-io-pin-properties (pins:Vector<IOXilinxPin>) -> [Tuple<PortDeclaration>,Tuple<PinProperties>] :
