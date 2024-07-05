@@ -161,6 +161,7 @@ defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> [Tuple<P
   val gtx-banks = IntSet()
   val gth-banks = IntSet()
   val gtavttrcal-banks = IntSet()
+  val gtrref-banks = IntSet()
 
   defn default-pin-properties (p:DedicatedXilinxPin) -> PinProperties :
     val bank = maybe-default(/bank(p), 0)
@@ -172,25 +173,14 @@ defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> [Tuple<P
   ;Build properties for each pin
   val props = to-tuple $ for p in pins seq : match(funcs(p)[0]) :
     (type:ConfigModeType) :
-      PinProperties(to-string("M%_" % [index(type)]), pin-refs(p), 0)
-
-    (type:PowerRailType) :
-      if prefix?(name(p), "VCCO") :
-        val bank = match(bank(p)) :
-          (b:One<Int>) : value(b)
-          (_) : throw(Exception("Power supply pin %_ has no bank" % [name(p)]))
-        add(vcco-banks, bank)
-        val name = to-string $ "VCCO[%_]" % [bank]
-        PinProperties(name, pin-refs(p), bank)
-      else :
-        default-pin-properties(p)
+      PinProperties(to-string("M[%_]" % [index(type)]), pin-refs(p), 0)
 
     (type:JTAGType) :
       switch(signal(type)) :
-        TCK : PinProperties("JTAG.TCK", pin-refs(p), 0)
-        TMS : PinProperties("JTAG.TMS", pin-refs(p), 0)
-        TDI : PinProperties("JTAG.TDI", pin-refs(p), 0)
-        TDO : PinProperties("JTAG.TDO", pin-refs(p), 0)
+        TCK : PinProperties("JTAG.tck", pin-refs(p), 0)
+        TMS : PinProperties("JTAG.tms", pin-refs(p), 0)
+        TDI : PinProperties("JTAG.tdi", pin-refs(p), 0)
+        TDO : PinProperties("JTAG.tdo", pin-refs(p), 0)
 
     (type:TransceiverClockType) :
       val bank = match(bank(p)) :
@@ -220,12 +210,45 @@ defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> [Tuple<P
       val pin-name = to-string $ "%_[%_].C[%_].%_.%_" % [class-str, bank, index(type), dir-str, pol-str]
       PinProperties(pin-name, pin-refs(p), bank)
 
+    (type:TransceiverRefType) :
+      if prefix?(name(p), "MGTAVTTRCAL") :
+        val bank = match(bank(p)) :
+          (b:One<Int>) : value(b)
+          (_) : throw(Exception("Calibration resistor pin %_ has no bank" % [name(p)]))
+        add(gtavttrcal-banks, bank)
+        val name = to-string $ "MGTAVTTRCAL[%_]" % [bank]
+        PinProperties(name, pin-refs(p), bank)
+      else if prefix?(name(p), "MGTRREF") :
+        val bank = match(bank(p)) :
+          (b:One<Int>) : value(b)
+          (_) : throw(Exception("Calibration resistor pin %_ has no bank" % [name(p)]))
+        add(gtavttrcal-banks, bank)
+        val name = to-string $ "MGTRREF[%_]" % [bank]
+        PinProperties(name, pin-refs(p), bank)
+      else :
+        throw(Exception("Unknown transceiver pin type %_" % [name(p)]))
+
+    (type:PowerRailType) :
+      if prefix?(name(p), "VCCO") :
+        val bank = match(bank(p)) :
+          (b:One<Int>) : value(b)
+          (_) : throw(Exception("Power supply pin %_ has no bank" % [name(p)]))
+        add(vcco-banks, bank)
+        val name = to-string $ "VCCO[%_]" % [bank]
+        PinProperties(name, pin-refs(p), bank)
+      else :
+        default-pin-properties(p)
+
     (_) :
       default-pin-properties(p)
 
   add(port-decls, PortDeclaration("VCCO", "pin", qsort(vcco-banks)))
   if length(gtclock-banks) > 0 :
     add(port-decls, PortDeclaration("MGTREFCLK", "virtex-7-gt-clock", qsort(gtclock-banks)))
+  if length(gtrref-banks) > 0 :
+    add(port-decls, PortDeclaration("MGTRREF", "pin", qsort(gtrref-banks)))
+  if length(gtavttrcal-banks) > 0 :
+    add(port-decls, PortDeclaration("MGTAVTTRCAL", "pin", qsort(gtavttrcal-banks)))
   for (name in ["MGTP", "MGTX", "MGTH"], banks in [gtp-banks, gtx-banks, gth-banks]) do :
     if length(banks) > 0 :
       add(port-decls, PortDeclaration(name, "virtex-7-gt-quad", qsort(banks)))
