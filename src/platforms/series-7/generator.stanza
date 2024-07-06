@@ -42,7 +42,7 @@ with:
 defmethod compare (a:PadRef, b:PadRef) -> Int :
   compare([length(row(a)), row(a), col(a)], [length(row(b)), row(b), col(b)])
 defmethod print (o:OutputStream, p:PadRef) -> False :
-  print(o, "%_%_" % [row(p), col(p)])
+  print(o, "%_[%_]" % [row(p), col(p)])
 defn PadRef (ref-str:String) -> PadRef :
   defn throw-invalid () -> Void :
     throw(Exception("Invalid pad reference %_" % [ref-str]))
