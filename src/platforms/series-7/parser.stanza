@@ -213,6 +213,37 @@ defn extract-diff-pair (v:String) -> [Int, Maybe<Diff-Polarity>]:
       (num:Int):
         [num, None()]
 
+defn extract-io-aux-func (func-name:String) -> SpecialFunction|False :
+  label<SpecialFunction|False> return :
+    if func-name == "DQS" :
+      return(MemoryStrobeType())
+
+    if func-name == "SRCC" :
+      return(SingleRegionClockType())
+
+    if func-name == "MRCC" :
+      return(MultiRegionClockType())
+
+    if prefix?(func-name, "AD") and (suffix(func-name, "P") or suffix(func-name, "N")) :
+      val k = length(func-name) - 1
+      match(to-int(func-name[2 to k])) :
+        (i:Int) :
+          val diff-pol = Diff-P when func-name[k] == 'P' else Diff-N
+          return(AnalogInputType(i, diff-pol))
+        (_) : false
+
+    if prefix?(func-name, "A") :
+      match(to-int(func-name[1 to false])) :
+        (i:Int) : return(BPIAddressType(i))
+        (_) : false
+
+    if prefix?(func-name, "T") :
+      match(to-int(func-name[1 to false])) :
+        (i:Int) : return(MemoryGroupType(i))
+        (_) : false
+
+    println("Warning: could not parse IO pin name component: %_" % [func-name])
+    false
 
 defn extract-io-pin (name:String, bank:Maybe<Int>) -> IOPinType :
   ; Pin names look like this:
@@ -232,7 +263,7 @@ defn extract-io-pin (name:String, bank:Maybe<Int>) -> IOPinType :
 
   val spec-funcs = Vector<SpecialFunction>()
 
-  val comps = to-tuple $ split(name, "_", 3)
+  val comps = to-tuple $ split(name, "_")
   val Ld = comps[1]
   val [io-id, diff?] = extract-diff-pair(Ld)
   match(diff?):
@@ -240,6 +271,10 @@ defn extract-io-pin (name:String, bank:Maybe<Int>) -> IOPinType :
       add(spec-funcs, DifferentialIOType(value(x)))
     (_): false
 
+  for comp in comps[2 to false] do :
+    match(extract-io-aux-func(comp)) :
+      (func:SpecialFunction) : add(spec-funcs, func)
+      (_) : false
 
   IOPinType(
     value!(bank),

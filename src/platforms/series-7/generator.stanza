@@ -25,6 +25,9 @@ defstruct IOXilinxPin <: XilinxPin :
   bank:Int
   channel:Int
   funcs:Tuple<SpecialFunction>
+  final-ref:String|False with:
+    init => false
+    setter => set-final-ref
 
 defn XilinxPin (pd:PinDescriptor) -> XilinxPin :
   match(parse(pd)) :
@@ -32,6 +35,12 @@ defn XilinxPin (pd:PinDescriptor) -> XilinxPin :
       DedicatedXilinxPin([PadRef(pin-ref(pd))], name(pd), bank(pd), func(pt))
     (pt:IOPinType) :
       IOXilinxPin(PadRef(pin-ref(pd)), name(pd), bank(pt), channel(pt), funcs(pt))
+
+defn final-ref! (p:IOXilinxPin) -> String :
+  match(final-ref(p)) :
+    (s:String) : s
+    (_) : throw(Exception("Final reference name for pin %_ has not been set yet"
+      % [name(p)]))
 
 defstruct PadRef <: Equalable&Comparable<PadRef>&Hashable :
   row:String
@@ -69,6 +78,16 @@ defstruct PortDeclaration :
 defmethod print (o:OutputStream, p:PortDeclaration) -> False :
   val index-arr-str = ("[[ %* ]]" % [join(indices(p), " ")]) when (length(indices(p)) > 0) else ""
   print(o, "port %_: %_%_" % [name(p), type(p), index-arr-str])
+
+defstruct SupportStmt :
+  name:String
+  support-pairs:Tuple<KeyValue<String,String>>
+defmethod print (o:OutputStream, x:SupportStmt) -> False :
+  if length(support-pairs) <= 0 :
+    println(o, "  supports %_" % [name(x)])
+  else :
+    println(o, "  supports %_ :" % [name(x)])
+    do({println(o, "    %_" % [_])}, support-pairs)
 
 ;============================================================
 ;======================== Generator =========================
@@ -255,6 +274,7 @@ defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> [Tuple<P
   [to-tuple(port-decls), props]
 
 ;Converts IO pins into rows for the pin properties table
+;Also generates the final reference names for each pin
 defn make-io-pin-properties (pins:Vector<IOXilinxPin>) -> [Tuple<PortDeclaration>,Tuple<PinProperties>] :
   val banks = IntTable<Vector<IOXilinxPin>>()
   for p in pins do :
@@ -268,24 +288,70 @@ defn make-io-pin-properties (pins:Vector<IOXilinxPin>) -> [Tuple<PortDeclaration
       throw(Exception("Bank %_ does not have 50 pins: %_" % [bid, length(bank)]))
     for p in bank seq :
       if channel(p) == 0 :
-        PinProperties(to-string("IO[%_].S[0]" % [bid]), [pin-ref(p)], bid)
+        set-final-ref(p, to-string("IO[%_].S[0]" % [bid]))
+        PinProperties(final-ref!(p), [pin-ref(p)], bid)
       else if channel(p) == 25 :
-        PinProperties(to-string("IO[%_].S[25]" % [bid]), [pin-ref(p)], bid)
+        set-final-ref(p, to-string("IO[%_].S[25]" % [bid]))
+        PinProperties(final-ref!(p), [pin-ref(p)], bid)
       else :
         val cid = channel(p)
         val diff-pol = match(find({_ is DifferentialIOType}, funcs(p))) :
           (dt:DifferentialIOType) : polarity(dt)
           (_) : throw(Exception("Channel %_ of bank %_ is not a differential pair" % [cid, bid]))
         if diff-pol is Diff-P :
-          val i = (2 * cid) - 1
-          PinProperties(to-string("IO[%_].D[%_].P" % [bid, cid]), [pin-ref(p)], bid)
+          set-final-ref(p, to-string("IO[%_].D[%_].P" % [bid, cid]))
+          PinProperties(final-ref!(p), [pin-ref(p)], bid)
         else :
-          val i = 2 * cid
-          PinProperties(to-string("IO[%_].D[%_].N" % [bid, cid]), [pin-ref(p)], bid)
+          set-final-ref(p, to-string("IO[%_].D[%_].N" % [bid, cid]))
+          PinProperties(final-ref!(p), [pin-ref(p)], bid)
 
   val bank-ids = qsort $ to-tuple $ keys(banks)
   val bank-decl = PortDeclaration("IO", "virtex-7-io-bank", bank-ids)
   [[bank-decl], to-tuple(props)]
+
+;Generate the support statements for the IO pins
+;Must be called after final pin references are set (by make-io-pin-properties)
+defn make-io-supports (pins:Vector<IOXilinxPin>) -> Tuple<SupportStmt> :
+  val adc-positives = Vector<IOXilinxPin|False>()
+  val adc-negatives = Vector<IOXilinxPin|False>()
+
+  for p in pins do :
+    for func in funcs(p) do :
+      match(func) :
+        (func:AnalogInputType) :
+          val adc-vec = adc-positives when polarity(func) is Diff-P else adc-negatives
+          lengthen(adc-vec, (index(func) + 1), false)
+          adc-vec[index(func)] = p
+        (func:SingleRegionClockType) :
+        (func:MemoryGroupType|MemoryStrobeType) :
+          ;TODO: memory byte group
+          false
+        (func) :
+          throw(Exception("Unexpected IO special function type %_" % [func]))
+
+
+  val result = Vector<SupportStmt>()
+
+  ;Analog digital converter supports
+  val len-adc-p = length(adc-positives)
+  val len-adc-n = length(adc-negatives)
+  if len-adc-p > len-adc-n :
+    throw(Exception("Analog differential positive input %_ has no match" % [adc-positives[len-adc-p - 1]]))
+  if len-adc-n < len-adc-p :
+    throw(Exception("Analog differential negative input %_ has no match" % [adc-negatives[len-adc-n - 1]]))
+  for i in 0 to len-adc-p do :
+    val [adc-p, adc-n] = match(adc-positives[i], adc-negatives[i]) :
+      (adc-p:IOXilinxPin, adc-n:IOXilinxPin) : [adc-p, adc-n]
+      (adc-p:IOXilinxPin, _) :
+        throw(Exception("Analog differential positive input %_ has no match" % [adc-p]))
+      (_, adc-n:IOXilinxPin) :
+        throw(Exception("Analog differential negative input %_ has no match" % [adc-n]))
+      (_, _) :
+        throw(Exception("Analog differential pair %_ is missing" % [i]))
+    add(result, SupportStmt("virtex-7-analog-gpio", [
+      "virtex-7-adc.ADC.P" => final-ref(adc-p),
+      "virtex-7-adc.ADC.N" => final-ref(adc-n)]))
+
 
 ;============================================================
 ;======================== Utilities =========================

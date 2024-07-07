@@ -74,3 +74,12 @@ with:
 public defstruct TransceiverRefType <: SerialTransceiverType
 with:
   printer => true
+
+;============================================================
+;============== Byte-wide Peripheral Interface ==============
+;============================================================
+
+public defstruct BPIAddressType <: SpecialFunction :
+  index:Int
+with:
+  printer => true
