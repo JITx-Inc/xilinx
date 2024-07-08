@@ -41,6 +41,11 @@ public defstruct MemoryStrobeType <: SpecialFunction
 with:
   printer => true
 
+public defstruct ConfigDataType <: SpecialFunction :
+  index:Int
+with:
+  printer => true
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; High Performance Transceivers
@@ -81,5 +86,21 @@ with:
 
 public defstruct BPIAddressType <: SpecialFunction :
   index:Int
+with:
+  printer => true
+
+public defstruct BPIAddressValidType <: SpecialFunction
+with:
+  printer => true
+
+public defstruct BPIChipSelectType <: SpecialFunction
+with:
+  printer => true
+
+public defstruct BPIOutputEnableType <: SpecialFunction
+with:
+  printer => true
+
+public defstruct BPIWriteEnableType <: SpecialFunction
 with:
   printer => true

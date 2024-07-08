@@ -83,11 +83,20 @@ defstruct SupportStmt :
   name:String
   support-pairs:Tuple<KeyValue<String,String>>
 defmethod print (o:OutputStream, x:SupportStmt) -> False :
-  if length(support-pairs) <= 0 :
+  if length(support-pairs(x)) <= 0 :
     println(o, "  supports %_" % [name(x)])
   else :
     println(o, "  supports %_ :" % [name(x)])
-    do({println(o, "    %_" % [_])}, support-pairs)
+    do({println(o, "    %_ => %_" % [key(_0), value(_0)])}, support-pairs(x))
+
+defstruct LoopedSupportStmts :
+  for-var:String
+  for-list:String
+  statements:Tuple<SupportStmt|LoopedSupportStmts>
+defmethod print (o:OutputStream, x:LoopedSupportStmts) -> False :
+  println(o, "  for %_ in %_ do :" % [for-var(x), for-list(x)])
+  val o2 = IndentedStream(o, 2)
+  do(print{o2, _}, statements(x))
 
 ;============================================================
 ;======================== Generator =========================
@@ -104,21 +113,52 @@ defpackage components/%_ :
   import jsl/bundles/debug
   import ocdb/utils/box-symbol
 
-pcb-bundle virtex-7-gt-clock :
-  port I : diff-pair[[0 to 2]]
+pcb-bundle virtex-7-io-bank :
+  port S : pin[[0 25]]
+  port D : diff-pair[[1 through 24]]
 
 pcb-bundle virtex-7-gt-quad :
   port C : lane-pair[[0 to 4]]
 
-pcb-bundle virtex-7-io-bank :
-  port S: pin[[0 25]]
-  port D: diff-pair[[1 through 24]]
+pcb-bundle virtex-7-gt-clock :
+  port I : diff-pair[[0 to 2]]
+
+pcb-bundle virtex-7-diff-gpio :
+  port D : diff-pair
+
+pcb-bundle virtex-7-adc :
+  port ADC : diff-pair
+
+pcb-bundle virtex-7-config-data :
+  port D : [[0 to 32]]
+
+pcb-bundle virtex-7-bpi :
+  pin ADV ; address output valid
+  port A : pin[[0 to 29]] ; address select output
+  port RS : pin[[0 to 2]] ; revision select
+  pin FCS ; chip select
+  pin FOE ; output enable
+  pin FWE ; write enable
+
+pcb-bundle virtex-7-vref :
+  pin VREF
+
+pcb-bundle virtex-7-single-region-clock :
+  pin SRCC
+
+pcb-bundle virtex-7-multi-region-clock :
+  pin MRCC
+
+pcb-bundle virtex-7-dci-vref-resistor :
+  pin VRN
+  pin VRP
 
 pcb-component %_ :
   %*
   pin-properties :
     [ pin:Ref | pads:Ref ... | bank:Int ]
     %*
+%*
   make-box-symbol()
   assign-landpattern(%_)
 <s>
@@ -135,10 +175,12 @@ defn simple-component (name:String, landpattern-name:String, pinout:XilinxPinout
 
   val [dd-ports, dd-props] = make-dedicated-pin-properties(dedicated-pins)
 
-  val [io-ports, io-props] = make-io-pin-properties(io-pins)
+  val [io-bank-ids, io-ports, io-props] = make-io-pin-properties(io-pins)
+
+  val supp-stmts = make-io-supports(io-pins, io-bank-ids)
 
   to-string $ SIMPLE-TMPLT % [name, name, join(cat(dd-ports, io-ports), "\n  "),
-    join(cat(dd-props, io-props), "\n    "), landpattern-name]
+    join(cat(dd-props, io-props), "\n    "), supp-stmts, landpattern-name]
 
 ;============================================================
 ;========================= Helpers ==========================
@@ -275,7 +317,7 @@ defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> [Tuple<P
 
 ;Converts IO pins into rows for the pin properties table
 ;Also generates the final reference names for each pin
-defn make-io-pin-properties (pins:Vector<IOXilinxPin>) -> [Tuple<PortDeclaration>,Tuple<PinProperties>] :
+defn make-io-pin-properties (pins:Vector<IOXilinxPin>) -> [Tuple<Int>,Tuple<PortDeclaration>,Tuple<PinProperties>] :
   val banks = IntTable<Vector<IOXilinxPin>>()
   for p in pins do :
     val bank-vec = set?(banks, bank(p), {Vector<IOXilinxPin>()})
@@ -307,30 +349,71 @@ defn make-io-pin-properties (pins:Vector<IOXilinxPin>) -> [Tuple<PortDeclaration
 
   val bank-ids = qsort $ to-tuple $ keys(banks)
   val bank-decl = PortDeclaration("IO", "virtex-7-io-bank", bank-ids)
-  [[bank-decl], to-tuple(props)]
+  [bank-ids, [bank-decl], to-tuple(props)]
 
 ;Generate the support statements for the IO pins
 ;Must be called after final pin references are set (by make-io-pin-properties)
-defn make-io-supports (pins:Vector<IOXilinxPin>) -> Tuple<SupportStmt> :
+defn make-io-supports (pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> Tuple<SupportStmt|LoopedSupportStmts> :
   val adc-positives = Vector<IOXilinxPin|False>()
   val adc-negatives = Vector<IOXilinxPin|False>()
+  val config-pins = Array<IOXilinxPin>(32)
+
+  ;Revision select
+  val rev-sel = Array<IOXilinxPin>(2)
+
+  val bpi-addr = Array<IOXilinxPin>(30)
+  ;[Address valid, chip select, output enable, write enable]
+  val bpi-extras = Array<IOXilinxPin>(4)
+
+  val result = Vector<SupportStmt|LoopedSupportStmts>()
 
   for p in pins do :
     for func in funcs(p) do :
       match(func) :
         (func:AnalogInputType) :
           val adc-vec = adc-positives when polarity(func) is Diff-P else adc-negatives
-          lengthen(adc-vec, (index(func) + 1), false)
+          if length(adc-vec) < index(func) + 1 :
+            lengthen(adc-vec, (index(func) + 1), false)
           adc-vec[index(func)] = p
+        (func:ConfigDataType) :
+          config-pins[index(func)] = p
+        (func:RevisionType) :
+          rev-sel[index(func)] = p
+        (func:BPIAddressType) :
+          bpi-addr[index(func)] = p
+        (func:BPIAddressValidType) :
+          bpi-extras[0] = p
+        (func:BPIChipSelectType) :
+          bpi-extras[1] = p
+        (func:BPIOutputEnableType) :
+          bpi-extras[2] = p
+        (func:BPIWriteEnableType) :
+          bpi-extras[3] = p
         (func:SingleRegionClockType) :
+          add(result, SupportStmt("virtex-7-single-region-clock", [
+            "virtex-7-single-region-clock.SRCC" => final-ref!(p)]))
+        (func:MultiRegionClockType) :
+          add(result, SupportStmt("virtex-7-multi-region-clock", [
+            "virtex-7-multi-region-clock.SRCC" => final-ref!(p)]))
         (func:MemoryGroupType|MemoryStrobeType) :
           ;TODO: memory byte group
+          false
+        (func:DifferentialIOType) :
+          ;Ignore diff polarity marking
           false
         (func) :
           throw(Exception("Unexpected IO special function type %_" % [func]))
 
-
-  val result = Vector<SupportStmt>()
+  ;GPIO support
+  add(result, LoopedSupportStmts("bank", to-string(bank-ids), [
+    SupportStmt("gpio", ["gpio.p" => "IO[bank].S[0]"])
+    LoopedSupportStmts("channel", "1 through 24", [
+      SupportStmt("virtex-7-diff-gpio", [
+        "virtex-7-diff-gpio.D" => "IO[bank].D[channel]"
+        ])
+      ])
+    SupportStmt("gpio", ["gpio.p" => "IO[bank].S[25]"])
+    ]))
 
   ;Analog digital converter supports
   val len-adc-p = length(adc-positives)
@@ -346,12 +429,32 @@ defn make-io-supports (pins:Vector<IOXilinxPin>) -> Tuple<SupportStmt> :
         throw(Exception("Analog differential positive input %_ has no match" % [adc-p]))
       (_, adc-n:IOXilinxPin) :
         throw(Exception("Analog differential negative input %_ has no match" % [adc-n]))
-      (_, _) :
+      (_0, _1) :
         throw(Exception("Analog differential pair %_ is missing" % [i]))
     add(result, SupportStmt("virtex-7-analog-gpio", [
-      "virtex-7-adc.ADC.P" => final-ref(adc-p),
-      "virtex-7-adc.ADC.N" => final-ref(adc-n)]))
+      "virtex-7-adc.ADC.P" => final-ref!(adc-p),
+      "virtex-7-adc.ADC.N" => final-ref!(adc-n)]))
 
+  ;Configuration data support
+  add(result, SupportStmt("virtex-7-config-data",
+    to-tuple $ for i in 0 to 32 seq :
+      to-string("virtex-7-config-data.D[%_]" % [i]) => final-ref!(config-pins[i])
+    ))
+
+  ;Byte peripheral interface support
+  add(result, SupportStmt("virtex-7-bpi", to-tuple $ cat-all $ [[
+    "virtex-7-bpi.ADV" => final-ref!(bpi-extras[0])],
+    for i in 0 to 29 seq :
+      to-string("virtex-7-bpi.A[%_]" % [i]) => final-ref!(bpi-addr[i]),
+    [
+    "virtex-7-bpi.RS[0]" => final-ref!(rev-sel[0]),
+    "virtex-7-bpi.RS[1]" => final-ref!(rev-sel[1]),
+    "virtex-7-bpi.FCS" => final-ref!(bpi-extras[1]),
+    "virtex-7-bpi.FOE" => final-ref!(bpi-extras[2]),
+    "virtex-7-bpi.FWE" => final-ref!(bpi-extras[3])
+    ]]))
+
+  to-tuple(result)
 
 ;============================================================
 ;======================== Utilities =========================

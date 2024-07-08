@@ -215,6 +215,10 @@ defn extract-diff-pair (v:String) -> [Int, Maybe<Diff-Polarity>]:
 
 defn extract-io-aux-func (func-name:String) -> SpecialFunction|False :
   label<SpecialFunction|False> return :
+    if func-name == "B" :
+      ;"active low" name marker for previous component
+      false
+
     if func-name == "DQS" :
       return(MemoryStrobeType())
 
@@ -224,12 +228,29 @@ defn extract-io-aux-func (func-name:String) -> SpecialFunction|False :
     if func-name == "MRCC" :
       return(MultiRegionClockType())
 
-    if prefix?(func-name, "AD") and (suffix(func-name, "P") or suffix(func-name, "N")) :
+    if func-name == "ADV" :
+      return(BPIAddressValidType())
+
+    if func-name == "FCS" :
+      return(BPIChipSelectType())
+
+    if func-name == "FOE" :
+      return(BPIOutputEnableType())
+
+    if func-name == "FWE" :
+      return(BPIWriteEnableType())
+
+    if prefix?(func-name, "AD") and (suffix?(func-name, "P") or suffix?(func-name, "N")) :
       val k = length(func-name) - 1
       match(to-int(func-name[2 to k])) :
         (i:Int) :
           val diff-pol = Diff-P when func-name[k] == 'P' else Diff-N
           return(AnalogInputType(i, diff-pol))
+        (_) : false
+
+    if prefix?(func-name, "RS") :
+      match(to-int(func-name[2 to false])) :
+        (i:Int) : return(RevisionType(i))
         (_) : false
 
     if prefix?(func-name, "A") :
@@ -240,6 +261,11 @@ defn extract-io-aux-func (func-name:String) -> SpecialFunction|False :
     if prefix?(func-name, "T") :
       match(to-int(func-name[1 to false])) :
         (i:Int) : return(MemoryGroupType(i))
+        (_) : false
+
+    if prefix?(func-name, "D") :
+      match(to-int(func-name[1 to false])) :
+        (i:Int) : return(ConfigDataType(i))
         (_) : false
 
     println("Warning: could not parse IO pin name component: %_" % [func-name])
