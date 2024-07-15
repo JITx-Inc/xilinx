@@ -130,7 +130,7 @@ pcb-bundle virtex-7-adc :
   port ADC : diff-pair
 
 pcb-bundle virtex-7-config-data :
-  port D : [[0 to 32]]
+  port D : pin[[0 to 32]]
 
 pcb-bundle virtex-7-bpi :
   pin ADV ; address output valid
@@ -394,7 +394,7 @@ defn make-io-supports (pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> Tuple<S
             "virtex-7-single-region-clock.SRCC" => final-ref!(p)]))
         (func:MultiRegionClockType) :
           add(result, SupportStmt("virtex-7-multi-region-clock", [
-            "virtex-7-multi-region-clock.SRCC" => final-ref!(p)]))
+            "virtex-7-multi-region-clock.MRCC" => final-ref!(p)]))
         (func:MemoryGroupType|MemoryStrobeType) :
           ;TODO: memory byte group
           false
@@ -409,7 +409,8 @@ defn make-io-supports (pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> Tuple<S
     SupportStmt("gpio", ["gpio.p" => "IO[bank].S[0]"])
     LoopedSupportStmts("channel", "1 through 24", [
       SupportStmt("virtex-7-diff-gpio", [
-        "virtex-7-diff-gpio.D" => "IO[bank].D[channel]"
+        "virtex-7-diff-gpio.D.P" => "IO[bank].D[channel].P"
+        "virtex-7-diff-gpio.D.N" => "IO[bank].D[channel].N"
         ])
       ])
     SupportStmt("gpio", ["gpio.p" => "IO[bank].S[25]"])
@@ -431,7 +432,7 @@ defn make-io-supports (pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> Tuple<S
         throw(Exception("Analog differential negative input %_ has no match" % [adc-n]))
       (_0, _1) :
         throw(Exception("Analog differential pair %_ is missing" % [i]))
-    add(result, SupportStmt("virtex-7-analog-gpio", [
+    add(result, SupportStmt("virtex-7-adc", [
       "virtex-7-adc.ADC.P" => final-ref!(adc-p),
       "virtex-7-adc.ADC.N" => final-ref!(adc-n)]))
 
