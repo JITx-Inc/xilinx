@@ -217,7 +217,7 @@ defn extract-io-aux-func (func-name:String) -> SpecialFunction|False :
   label<SpecialFunction|False> return :
     if func-name == "B" :
       ;"active low" name marker for previous component
-      false
+      return(false)
 
     if func-name == "DQS" :
       return(MemoryStrobeType())
