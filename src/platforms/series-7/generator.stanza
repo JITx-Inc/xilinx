@@ -25,6 +25,7 @@ defstruct IOXilinxPin <: XilinxPin :
   name:String
   bank:Int
   channel:Int
+  mem-byte-grp:Maybe<Int>
   funcs:Tuple<SpecialFunction>
   final-ref:String|False with:
     init => false
@@ -35,7 +36,7 @@ defn XilinxPin (pd:PinDescriptor) -> XilinxPin :
     (pt:DedicatedPinType) :
       DedicatedXilinxPin([PadRef(pin-ref(pd))], name(pd), bank(pd), func(pt))
     (pt:IOPinType) :
-      IOXilinxPin(PadRef(pin-ref(pd)), name(pd), bank(pt), channel(pt), funcs(pt))
+      IOXilinxPin(PadRef(pin-ref(pd)), name(pd), bank(pt), channel(pt), mem-byte-grp(pd), funcs(pt))
 
 defn final-ref! (p:IOXilinxPin) -> String :
   match(final-ref(p)) :
@@ -69,8 +70,10 @@ defstruct PinProperties :
   name:String
   pads:Tuple<PadRef>
   bank:Int
+  mem-byte-grp:Maybe<Int> with:
+    default => None()
 defmethod print (o:OutputStream, p:PinProperties) -> False :
-  print(o, "[ %_ | %* | %_ ]" % [name(p), join(pads(p), " "), bank(p)])
+  print(o, "[ %_ | %* | %_ | %_ ]" % [name(p), join(pads(p), " "), bank(p), maybe-default(mem-byte-grp(p), "-")])
 
 defstruct PortDeclaration :
   name:String
@@ -105,6 +108,7 @@ defn for-stmt (for-vars:Seqable<Expr>, for-lists:Seqable<Expr>, body:Tuple<Expr>
 
 ;Convenience function for generating a supports statement
 ;The body of the supports will contain "name.key(pair) => value(pair)" for each pair in 'support-pairs'
+;Do not include the bundle name in the key
 defn support-stmt (name:Expr, support-pairs:Tuple<KeyValue<Expr,Expr>>) -> Expr :
   val body = to-tuple $ for pair in support-pairs seq :
     to-string("%_.%_ => %_" % [name, key(pair), value(pair)])
@@ -202,7 +206,9 @@ defn simple-component (name:String, landpattern-name:String, pinout:XilinxPinout
 
   val supp-stmts = make-io-supports(io-pins, io-bank-ids)
 
-  val props-stmt = BodyExpr("pin-properties :", to-tuple(seq(to-string, cat(dd-props, io-props))))
+  val props-stmt = BodyExpr("pin-properties :", to-tuple(
+    cat(["[ pin:Ref | pads:Ref ... | bank:Int | memory-byte-group:Int ]"],
+    seq(to-string, cat(dd-props, io-props)))))
   val comp-stmt = BodyExpr("pcb-component %_ :" % [name], to-tuple $ cat-all $ [
     seq(to-string, cat(dd-ports, io-ports)),
     [props-stmt],
@@ -362,10 +368,10 @@ defn make-io-pin-properties (pins:Vector<IOXilinxPin>) -> [Tuple<Int>,Tuple<Port
     for p in bank seq :
       if channel(p) == 0 :
         set-final-ref(p, to-string("IO[%_].S[0]" % [bid]))
-        PinProperties(final-ref!(p), [pin-ref(p)], bid)
+        PinProperties(final-ref!(p), [pin-ref(p)], bid, mem-byte-grp(p))
       else if channel(p) == 25 :
         set-final-ref(p, to-string("IO[%_].S[25]" % [bid]))
-        PinProperties(final-ref!(p), [pin-ref(p)], bid)
+        PinProperties(final-ref!(p), [pin-ref(p)], bid, mem-byte-grp(p))
       else :
         val cid = channel(p)
         val diff-pol = match(find({_ is DifferentialIOType}, funcs(p))) :
@@ -373,10 +379,10 @@ defn make-io-pin-properties (pins:Vector<IOXilinxPin>) -> [Tuple<Int>,Tuple<Port
           (_) : throw(Exception("Channel %_ of bank %_ is not a differential pair" % [cid, bid]))
         if diff-pol is Diff-P :
           set-final-ref(p, to-string("IO[%_].D[%_].P" % [bid, cid]))
-          PinProperties(final-ref!(p), [pin-ref(p)], bid)
+          PinProperties(final-ref!(p), [pin-ref(p)], bid, mem-byte-grp(p))
         else :
           set-final-ref(p, to-string("IO[%_].D[%_].N" % [bid, cid]))
-          PinProperties(final-ref!(p), [pin-ref(p)], bid)
+          PinProperties(final-ref!(p), [pin-ref(p)], bid, mem-byte-grp(p))
 
   val bank-ids = qsort $ to-tuple $ keys(banks)
   val bank-decl = PortDeclaration("IO", "virtex-7-io-bank", bank-ids)
