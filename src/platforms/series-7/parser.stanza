@@ -240,6 +240,15 @@ defn extract-io-aux-func (func-name:String) -> SpecialFunction|False :
     if func-name == "FWE" :
       return(BPIWriteEnableType())
 
+    if func-name == "VREF" :
+      return(VREFType())
+
+    if func-name == "VRP" :
+      return(DCIRefType(DCI-P))
+
+    if func-name == "VRN" :
+      return(DCIRefType(DCI-N))
+
     if prefix?(func-name, "AD") and (suffix?(func-name, "P") or suffix?(func-name, "N")) :
       val k = length(func-name) - 1
       match(to-int(func-name[2 to k])) :

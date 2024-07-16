@@ -160,6 +160,10 @@ public defstruct VREFType <: SpecialFunction
 with:
   printer => true
 
+public defenum DCITransistorType :
+  DCI-N
+  DCI-P
+
 doc: \<DOC>
 The DCI Ref (VRP/VRN) Type pins
 
@@ -167,7 +171,8 @@ These pins are typically used for the DDR termination references.
 In 7 series, the DCI comes in a VRP and VRN version.
 In Ultrascale, the DCI comes in only a VRP.
 <DOC>
-public defstruct DCIRefType <: SpecialFunction
+public defstruct DCIRefType <: SpecialFunction :
+  transistor-type:DCITransistorType
 with:
   printer => true
 
