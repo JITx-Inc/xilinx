@@ -154,6 +154,9 @@ pcb-bundle virtex-7-revision-select :
 pcb-bundle virtex-7-vref :
   pin VREF
 
+pcb-bundle virtex-7-memory-strobe :
+  port DQS : diff-pair
+
 pcb-bundle virtex-7-memory-byte-pin :
   pin MBP
 
@@ -392,6 +395,7 @@ defn make-io-pin-properties (pins:Vector<IOXilinxPin>) -> [Tuple<Int>,Tuple<Port
 ;Must be called after final pin references are set (by make-io-pin-properties)
 defn make-io-supports (pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> Vector<Expr> :
   val bank-ids-str = pretty-indices-str(bank-ids)
+  val bank-ids-for-loop-str = compactify-for-loop-indices(bank-ids)
 
   ;Configuration mode pins
   val config-pins = Array<IOXilinxPin>(32)
@@ -414,7 +418,7 @@ defn make-io-supports (pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> Vector<
     for func in funcs(p) do :
       match(func) :
         (func:AnalogInputType) :
-          ;Ignore
+          ;Handled separately
           false
         (func:ConfigDataType) :
           config-pins[index(func)] = p
@@ -435,7 +439,7 @@ defn make-io-supports (pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> Vector<
         (func:MultiRegionClockType) :
           add(mrcc-pins, [bank(p), channel(p)])
         (func:MemoryGroupType|MemoryStrobeType) :
-          ;TODO: memory byte group
+          ;Handled separately
           false
         (func:DifferentialIOType) :
           ;Ignore diff polarity marking
@@ -443,7 +447,7 @@ defn make-io-supports (pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> Vector<
         (func:VREFType) :
           add(vref-pins, p)
         (func:DCIRefType) :
-          ;Ignore
+          ;Handled separately
           false
         (func) :
           throw(Exception("Unexpected IO special function type %_" % [func]))
@@ -451,15 +455,15 @@ defn make-io-supports (pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> Vector<
   val result = Vector<Expr>()
 
   ;GPIO support
-  add(result, for-stmt("bank", bank-ids-str, [
-    support-stmt("gpio", ["gpio.p" => "IO[bank].S[0]"])
+  add(result, for-stmt("bank", bank-ids-for-loop-str, [
+    support-stmt("gpio", ["p" => "IO[bank].S[0]"])
     for-stmt("channel", "1 through 24", [
       support-stmt("virtex-7-diff-gpio", [
         "D.P" => "IO[bank].D[channel].P"
         "D.N" => "IO[bank].D[channel].N"
         ])
       ])
-    support-stmt("gpio", ["gpio.p" => "IO[bank].S[25]"])
+    support-stmt("gpio", ["p" => "IO[bank].S[25]"])
     ]))
 
   ;Configuration data support
@@ -483,38 +487,14 @@ defn make-io-supports (pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> Vector<
     ]))
   add(result, support-stmt("virtex-7-bpi-address",
     to-tuple $ for i in 0 to 29 seq :
-      ("A[%_]" % [i]) => final-ref!(bpi-addr[i])
+      ("ADDR[%_]" % [i]) => final-ref!(bpi-addr[i])
     ))
 
   ;VREF supports
-  add(result, for-stmt("p", to-string(to-tuple(seq(final-ref!, vref-pins))), [
+  add(result, for-stmt("p", to-string("[%,]" % [seq(final-ref!, vref-pins)]), [
     support-stmt("virtex-7-vref", [
       "VREF" => "p"
     ])]))
-
-  ;Memory byte pins
-  add(result, for-stmt("bank", bank-ids-str, [
-    for-stmt("channel", "1 through 24", [
-      support-stmt("virtex-7-memory-byte-pin", [
-        "MBP" => "IO[bank].D[channel].P"
-        ]),
-      support-stmt("virtex-7-memory-byte-pin", [
-        "MBP" => "IO[bank].D[channel].N"
-        ])
-      ])
-    ]))
-
-  ;TODO: Memory DQS pairs
-
-  ;TODO: Memory byte group supports
-  ; add(result, for-stmt("bank", bank-ids-str, [
-  ;   for-stmt("channel", "1 through 24", [
-  ;     -- Insert bank + channel restrict statement here --
-  ;     support-stmt("virtex-7-memory-byte-group", [
-  ;       "virtex-7-memory-byte-group.DQS" => "IO[bank].D[channel].P"
-  ;       ])
-  ;     ])
-  ;   ]))
 
   ;Clock supports
   add(result, for-stmt("bank-and-channel", to-string(qsort(srcc-pins, compare)), [
@@ -532,6 +512,8 @@ defn make-io-supports (pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> Vector<
 
   add-all(result, make-adc-supports(pins))
   add-all(result, make-dci-supports(pins))
+  add-all(result, make-memory-strobe-supports(pins))
+  add-all(result, make-memory-byte-group-supports(pins, bank-ids))
 
   result
 
@@ -594,13 +576,94 @@ defn make-dci-supports (pins:Vector<IOXilinxPin>) -> Tuple<Expr> :
   if banks != banks-p :
     throw(Exception("VRN banks and VRP banks do not match: %_ vs %_" % [banks, banks-p]))
 
-  val banks-str = pretty-indices-str(banks)
+  val banks-str = compactify-for-loop-indices(banks)
   [for-stmt("bank", banks-str, [
     support-stmt("virtex-7-dci-vref-n", [
-      "VRN" => "IO[bank].D[0]"]),
+      "VRN" => "IO[bank].S[0]"]),
     support-stmt("virtex-7-dci-vref-p", [
-      "VRP" => "IO[bank].D[25]"])
+      "VRP" => "IO[bank].S[25]"])
     ])]
+
+defn make-memory-strobe-supports (pins:Vector<IOXilinxPin>) -> Tuple<Expr> :
+  val DQSBundleType = new BundleType<[Int,Int],IOXilinxPin> :
+    defmethod print (o:OutputStream, this) : print(o, "memory strobe bundle type")
+    defmethod width (this) : 2
+    defmethod in-bundle? (this, p:IOXilinxPin) -> KeyValue<[Int,Int],Int>|False :
+      match(find({_ is MemoryStrobeType}, funcs(p))) :
+        (func:MemoryStrobeType) :
+          val grp = match(mem-byte-grp(p)) :
+            (i:One<Int>) : value(i)
+            (_) : throw(Exception("Memory strobe pin has no memory byte group: %_" % [p]))
+          val index = match(diff-polarity(p)) :
+            (_:Diff-P) : 0
+            (_:Diff-N) : 1
+            (_) : throw(Exception("Memory strobe pin is not differential: %_" % [p]))
+          [bank(p), grp] => index
+        (_) : false
+  val strobe-pairs = collect-bundles(DQSBundleType, pins)
+  val bank+channels = to-tuple $ for pair in qsort(strobe-pairs, {compare(key(_0), key(_1))}) seq :
+    val [dp, dn] = value(pair) as [IOXilinxPin,IOXilinxPin]
+    if bank(dp) != bank(dn) :
+      throw(Exception("Strobe pair pins are not the same bank: %_ %_" % [dp, dn]))
+    if channel(dp) != channel(dn) :
+      throw(Exception("Strobe pair pins are not the same channel: %_ %_" % [dp, dn]))
+    [bank(dp), channel(dp)]
+  [for-stmt("bank-and-channel", to-string(bank+channels), [
+    "val [bank, channel] = bank-and-channel",
+    support-stmt("virtex-7-memory-strobe", [
+      "DQS.P" => "IO[bank].D[channel].P",
+      "DQS.N" => "IO[bank].D[channel].N"])
+    ])]
+
+defn make-memory-byte-group-supports (pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> Tuple<Expr> :
+  val bank-ids-for-loop-str = compactify-for-loop-indices(bank-ids)
+  [
+  for-stmt("bank", bank-ids-for-loop-str, [
+    for-stmt("channel", "1 through 24", [
+      support-stmt("virtex-7-memory-byte-pin", [
+        "MBP" => "IO[bank].D[channel].P"]),
+      support-stmt("virtex-7-memory-byte-pin", [
+        "MBP" => "IO[bank].D[channel].N"])
+      ])
+    ])
+  for-stmt("bank", bank-ids-for-loop-str, [
+    for-stmt("group", "0 to 4", [
+      BodyExpr("defn match-bank-group (p) :", ["(property?(p.bank) == One(bank)) and",
+        "  (property?(p.memory-byte-group) == One(group))"
+        ]),
+      BodyExpr("supports virtex-7-memory-byte-group :", [
+        "require clk:virtex-7-memory-strobe from self",
+        "restrict(clk.DQS.P, match-bank-group)",
+        "virtex-7-memory-byte-group.DQS.P => clk.DQS.P",
+        "virtex-7-memory-byte-group.DQS.N => clk.DQS.N",
+        for-stmt("i", "0 to 8", [
+          "require p:virtex-7-memory-byte-pin from self",
+          "restrict(p.MBP, match-bank-group)"
+          "virtex-7-memory-byte-group.P[i] => p.MBP"
+          ])
+        ])
+      ])
+    ])
+  for-stmt("bank", bank-ids-for-loop-str, [
+    for-stmt("group", "0 to 4", [
+      BodyExpr("defn match-bank-group (p) :", ["(property?(p.bank) == One(bank)) and (property?(p.memory-byte-group) == One(group))"]),
+      BodyExpr("supports virtex-7-memory-byte-group-with-vref :", [
+        "require clk:virtex-7-memory-strobe from self",
+        "restrict(clk.DQS.P, match-bank-group)",
+        "virtex-7-memory-byte-group-with-vref.DQS.P => clk.DQS.P",
+        "virtex-7-memory-byte-group-with-vref.DQS.N => clk.DQS.N",
+        for-stmt("i", "0 to 8", [
+          "require p:virtex-7-memory-byte-pin from self",
+          "restrict(p.MBP, match-bank-group)"
+          "virtex-7-memory-byte-group-with-vref.P[i] => p.MBP"
+          ])
+        "require v:virtex-7-vref from self",
+        "restrict(v.VREF, fn (p) : property?(p.bank) == One(bank))",
+        "virtex-7-memory-byte-group-with-vref.VREF => v.VREF"
+        ])
+      ])
+    ])
+  ]
 
 ;============================================================
 ;======================== Utilities =========================
@@ -651,6 +714,22 @@ defn compactify (indices:Seqable<Int>) -> Tuple<Int|Range> :
 
 defn pretty-indices-str (indices:Seqable<Int>) -> String :
   to-string("[%,]" % [compactify(indices)])
+
+defn compactify-for-loop-indices (indices:Seqable<Int>) -> String :
+  defn make-seqable (x:Int|Range) :
+    match(x) :
+      (x:Int) : [x]
+      (x:Range) : x
+  val indices* = compactify(indices)
+  if length(indices*) == 1 :
+    match(indices*[0]) :
+      (i:Int) : to-string([i])
+      (r:Range) : to-string(r)
+  else :
+    if any?({_ is Range}, indices*) :
+      to-string $ "cat-all([%,])" % [seq(make-seqable, indices*)]
+    else :
+      to-string(indices*)
 
 defn with-default<?T> (x:?T|False, default:?T) -> T :
   match(x) :
