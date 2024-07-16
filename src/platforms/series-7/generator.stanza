@@ -201,9 +201,9 @@ defn simple-component (name:String, landpattern-name:String, pinout:XilinxPinout
       (p:IOXilinxPin) : add(io-pins, p)
       (p:DedicatedXilinxPin) : add(ungrouped-dedicated-pins, p)
 
-  val dedicated-pins = group-by-name(ungrouped-dedicated-pins)
+  val [dedicated-pins, gnd-pins] = group-by-name(ungrouped-dedicated-pins)
 
-  val [dd-ports, dd-props] = make-dedicated-pin-properties(dedicated-pins)
+  val [dd-ports, dd-props] = make-dedicated-pin-properties(dedicated-pins, gnd-pins)
 
   val [io-bank-ids, io-ports, io-props] = make-io-pin-properties(io-pins)
 
@@ -227,35 +227,45 @@ defn simple-component (name:String, landpattern-name:String, pinout:XilinxPinout
 ;============================================================
 
 ;Groups pins with the same name into one pin
-defn group-by-name (pins:Seqable<DedicatedXilinxPin>) -> Vector<DedicatedXilinxPin> :
+;Returns the GND pins separately
+defn group-by-name (pins:Seqable<DedicatedXilinxPin>) -> [Vector<DedicatedXilinxPin>,Vector<DedicatedXilinxPin>] :
   val result = Vector<DedicatedXilinxPin>()
+  val gnd-pins = Vector<DedicatedXilinxPin>()
   ;Index of pin group by pin name
   val group-index-by-name = HashTable<String,Int>()
 
   ;Perform grouping
   for p in pins do :
-    match(get?(group-index-by-name, name(p))) :
-      (i:Int) :
-        val old-pin = result[i]
-        if bank(old-pin) != bank(p) :
-          throw(Exception("Pin %_ has bank %_ for pads %_ but bank %_ for pads %_" % [name(p), bank(p), pin-refs(p),
-            bank(old-pin), pin-refs(old-pin)]))
-        val new-pin-refs = qsort(cat(pin-refs(old-pin), pin-refs(p)))
-        result[i] = sub-pin-refs(old-pin, new-pin-refs)
-      (_) :
-        group-index-by-name[name(p)] = length(result)
-        add(result, p)
-  result
+    if name(p) == "GND" :
+      add(gnd-pins, p)
+    else :
+      match(get?(group-index-by-name, name(p))) :
+        (i:Int) :
+          val old-pin = result[i]
+          if bank(old-pin) != bank(p) :
+            throw(Exception("Pin %_ has bank %_ for pads %_ but bank %_ for pads %_" % [name(p), bank(p), pin-refs(p),
+              bank(old-pin), pin-refs(old-pin)]))
+          val new-pin-refs = qsort(cat(pin-refs(old-pin), pin-refs(p)))
+          result[i] = sub-pin-refs(old-pin, new-pin-refs)
+        (_) :
+          group-index-by-name[name(p)] = length(result)
+          add(result, p)
+  [result, gnd-pins]
 
 ;Converts dedicated pins into rows for the pin properties table
-defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> [Tuple<PortDeclaration>,Tuple<PinProperties>] :
-  ;TODO: create a generalized framework for building and declaring bundles
+;Also returns port declarations and net statements
+defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>, gnd-pins:Vector<DedicatedXilinxPin>) -> [Tuple<PortDeclaration>,Tuple<PinProperties>] :
   val port-decls = Vector<PortDeclaration>()
+
+  ;Static port declarations
+  ;GND pins
+  add(port-decls, PortDeclaration("GND", "pin", to-tuple(0 to length(gnd-pins))))
   ;Config mode pins
   add(port-decls, PortDeclaration("M", "pin", [0 1 2]))
   ;JTAG
   add(port-decls, PortDeclaration("JTAG", "jtag", []))
-  ;Multi-bank ports
+
+  ;Dynamic port declaration bank sets
   val vcco-banks = IntSet()
   val gtclock-banks = IntSet()
   val gtp-banks = IntSet()
@@ -264,6 +274,7 @@ defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> [Tuple<P
   val gtavttrcal-banks = IntSet()
   val gtrref-banks = IntSet()
 
+  ;Default pin property row for non-specially-handled dedicated pins
   defn default-pin-properties (p:DedicatedXilinxPin) -> PinProperties :
     val bank = maybe-default(/bank(p), 0)
     val name = if bank == 0 and suffix?(name(p), "_0") :
@@ -272,7 +283,7 @@ defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> [Tuple<P
     PinProperties(name, pin-refs(p), bank)
 
   ;Build properties for each pin
-  val props = to-tuple $ for p in pins seq : match(funcs(p)[0]) :
+  val non-gnd-props = for p in pins seq : match(funcs(p)[0]) :
     (type:ConfigModeType) :
       PinProperties(to-string("M[%_]" % [index(type)]), pin-refs(p), 0)
 
@@ -343,6 +354,13 @@ defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> [Tuple<P
     (_) :
       default-pin-properties(p)
 
+  ;GND pin properties
+  qsort!({pin-refs(_)[0]}, gnd-pins)
+  val gnd-props = for (i in 0 to false, p in gnd-pins) seq :
+    PinProperties(to-string("GND[%_]" % [i]), pin-refs(p), 0)
+  val props = to-tuple(cat(gnd-props, non-gnd-props))
+
+  ;Dynamic multi-bank port declarations
   add(port-decls, PortDeclaration("VCCO", "pin", to-tuple(vcco-banks)))
   if length(gtclock-banks) > 0 :
     add(port-decls, PortDeclaration("MGTREFCLK", "virtex-7-gt-clock", to-tuple(gtclock-banks)))
@@ -353,6 +371,7 @@ defn make-dedicated-pin-properties (pins:Vector<DedicatedXilinxPin>) -> [Tuple<P
   for (name in ["MGTP", "MGTX", "MGTH"], banks in [gtp-banks, gtx-banks, gth-banks]) do :
     if length(banks) > 0 :
       add(port-decls, PortDeclaration(name, "virtex-7-gt-quad", to-tuple(banks)))
+
   [to-tuple(port-decls), props]
 
 ;Converts IO pins into rows for the pin properties table
