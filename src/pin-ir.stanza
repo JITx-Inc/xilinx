@@ -53,6 +53,15 @@ positive or negative side of the differential function.
 public deftype PolarizedType
 public defmulti polarity (p:PolarizedType) -> Diff-Polarity
 
+doc: \<DOC>
+No-connect Function Type
+
+These pins are left unconnected
+<DOC>
+public deftype NoConnectType <: SpecialFunction
+with:
+  printer => true
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;  Cardinality
 ; This specifies the input/output nature

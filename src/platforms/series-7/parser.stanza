@@ -91,6 +91,7 @@ defn parse-serial-transceiver (name:String, bank:Maybe<Int>) -> SerialTransceive
 ;  The function is called with the pin name and optional bank index as arguments
 ;  The function returns either a `SpecialFunction` or `Tuple<SpecialFunction>`
 val dedicated-map = [
+  ["NC", fn (x, y) : NoConnectType()],
   ; Config
   ["CCLK", fn (x, y) : ConfigType()],
   ["DONE", fn (x, y) : ConfigType()],
@@ -213,41 +214,24 @@ defn extract-diff-pair (v:String) -> [Int, Maybe<Diff-Polarity>]:
       (num:Int):
         [num, None()]
 
+val io-map = [
+  "B" => false, ;"active low" name marker for previous component
+  "DQS" => MemoryStrobeType(),
+  "MRCC" => MultiRegionClockType(),
+  "ADV" => BPIAddressValidType(),
+  "FCS" => BPIChipSelectType(),
+  "FOE" => BPIOutputEnableType(),
+  "FWE" => BPIWriteEnableType(),
+  "VREF" => VREFType(),
+  "VRP" => DCIRefType(DCI-P),
+  "VRN" => DCIRefType(DCI-N)
+  ]
+
 defn extract-io-aux-func (func-name:String) -> SpecialFunction|False :
   label<SpecialFunction|False> return :
-    if func-name == "B" :
-      ;"active low" name marker for previous component
-      return(false)
-
-    if func-name == "DQS" :
-      return(MemoryStrobeType())
-
-    if func-name == "SRCC" :
-      return(SingleRegionClockType())
-
-    if func-name == "MRCC" :
-      return(MultiRegionClockType())
-
-    if func-name == "ADV" :
-      return(BPIAddressValidType())
-
-    if func-name == "FCS" :
-      return(BPIChipSelectType())
-
-    if func-name == "FOE" :
-      return(BPIOutputEnableType())
-
-    if func-name == "FWE" :
-      return(BPIWriteEnableType())
-
-    if func-name == "VREF" :
-      return(VREFType())
-
-    if func-name == "VRP" :
-      return(DCIRefType(DCI-P))
-
-    if func-name == "VRN" :
-      return(DCIRefType(DCI-N))
+    for kv in io-map do :
+      if key(kv) == func-name :
+        return(value(kv))
 
     if prefix?(func-name, "AD") and (suffix?(func-name, "P") or suffix?(func-name, "N")) :
       val k = length(func-name) - 1
