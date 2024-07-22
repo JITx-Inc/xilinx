@@ -217,6 +217,7 @@ defn extract-diff-pair (v:String) -> [Int, Maybe<Diff-Polarity>]:
 val io-map = [
   "B" => false, ;"active low" name marker for previous component
   "DQS" => MemoryStrobeType(),
+  "SRCC" => SingleRegionClockType(),
   "MRCC" => MultiRegionClockType(),
   "ADV" => BPIAddressValidType(),
   "FCS" => BPIChipSelectType(),
