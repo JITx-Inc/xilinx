@@ -97,18 +97,24 @@ public defstruct ConfigType <: SpecialFunction
 with:
   printer => true
 
-public defenum ConfigBus:
-  DataBus
-  AddressBus
+doc: \<DOC>
+Configuration Address Bus Function
+
+The configuration interface typically has an address bus for reading data during
+configuration.
+<DOC>
+public defstruct ConfigAddressBusType <: ConfigType & IndexableType :
+  index:Int with: (as-method => true)
+with:
+  printer => true
 
 doc: \<DOC>
-Configuration Data/Address Bus Functions
+Configuration Data Bus Function
 
-The configuration interface typically has a data and
-address bus that are used in certain configuration modes.
+The configuration interface typically has data bus for reading data during
+configuration.
 <DOC>
-public defstruct ConfigBusType <: ConfigType & IndexableType :
-  bus-type:ConfigBus
+public defstruct ConfigDataBusType <: ConfigType & IndexableType :
   index:Int with: (as-method => true)
 with:
   printer => true

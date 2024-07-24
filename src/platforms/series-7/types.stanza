@@ -41,8 +41,21 @@ public defstruct MemoryStrobeType <: SpecialFunction
 with:
   printer => true
 
+public defenum ConfigDataPinType :
+  CONFIG-PUDC   ;pull-up during configuration
+  CONFIG-EMCCLK ;external master clock
+  CONFIG-CSI    ;chip select input
+  CONFIG-CSO    ;chip select output
+  CONFIG-DOUT   ;data output
+  CONFIG-RDWR   ;selectmap read/write direction
+  CONFIG-MOSI   ;SPI master-output slave-input
+  CONFIG-DIN    ;data input
+
+doc: \<DOC>
+Configuration Data Type
+<DOC>
 public defstruct ConfigDataType <: SpecialFunction :
-  index:Int
+  type:ConfigDataPinType
 with:
   printer => true
 

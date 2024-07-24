@@ -226,6 +226,14 @@ val io-map = [
   "VREF" => VREFType(),
   "VRP" => DCIRefType(DCI-P),
   "VRN" => DCIRefType(DCI-N)
+  "PUDC" => ConfigDataType(CONFIG-PUDC),
+  "EMCCLK" => ConfigDataType(CONFIG-EMCCLK),
+  "CSI" => ConfigDataType(CONFIG-CSI),
+  "CSO" => ConfigDataType(CONFIG-CSO),
+  "DOUT" => ConfigDataType(CONFIG-DOUT),
+  "RDWR" => ConfigDataType(CONFIG-RDWR),
+  "MOSI" => ConfigDataType(CONFIG-MOSI),
+  "DIN" => ConfigDataType(CONFIG-DIN)
   ]
 
 defn extract-io-aux-func (func-name:String) -> SpecialFunction|False :
@@ -259,7 +267,7 @@ defn extract-io-aux-func (func-name:String) -> SpecialFunction|False :
 
     if prefix?(func-name, "D") :
       match(to-int(func-name[1 to false])) :
-        (i:Int) : return(ConfigDataType(i))
+        (i:Int) : return(ConfigDataBusType(i))
         (_) : false
 
     println("Warning: could not parse IO pin name component: %_" % [func-name])

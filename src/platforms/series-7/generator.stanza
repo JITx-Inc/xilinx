@@ -74,7 +74,8 @@ defn PadRef (ref-str:String) -> PadRef :
 defstruct ComponentOutline :
   comp-ports:Vector<Expr> with: (init => Vector<Expr>())
   pin-props:Vector<Expr> with: (init => Vector<Expr>())
-  symbol-stmts:Vector<Expr> with: (init => Vector<Expr>())
+  symbol-set-bank-stmts:Vector<Expr> with: (init => Vector<Expr>())
+  symbol-assign-stmts:Vector<Expr> with: (init => Vector<Expr>())
   module-ports:Vector<Expr> with: (init => Vector<Expr>())
   module-nets:Vector<Expr> with: (init => Vector<Expr>())
   support-stmts:Vector<Expr> with: (init => Vector<Expr>())
@@ -127,10 +128,14 @@ defn port-net-loop-stmt (name:Expr) -> Expr :
 ;Create a supports statement
 ;The body of the supports will contain "name.key(pair) => value(pair)" for each pair in 'support-pairs'
 ;Do not include the bundle name in the key
-defn support-stmt (name:Expr, support-pairs:Seqable<KeyValue<Expr,Expr>>) -> Expr :
+defn support-stmt (name:Expr, support-pairs:Seqable<KeyValue<Expr,Expr>> -- params:Tuple<Expr> = []) -> Expr :
   val body = to-tuple $ for pair in support-pairs seq :
     to-string("%_.%_ => %_" % [name, key(pair), value(pair)])
-  BodyExpr(to-string("supports %_ :" % [name]), body)
+  val param-str =
+    if length(params) > 0 :
+      "(%,)" % [params]
+    else : ""
+  BodyExpr(to-string("supports %_%_ :" % [name, param-str]), body)
 
 ;============================================================
 ;======================== Generator =========================
@@ -143,9 +148,10 @@ defpackage components/%_ :
   import collections
   import jitx
   import jitx/commands
+  import jsl/design/settings
   import jsl/bundles
   import jsl/bundles/debug
-  import ocdb/utils/box-symbol
+  import jsl/symbols/box-symbol
 
 pcb-bundle virtex-7-io-bank :
   port S : pin[[0 25]]
@@ -163,8 +169,39 @@ pcb-bundle virtex-7-diff-gpio :
 pcb-bundle virtex-7-adc :
   port ADC : diff-pair
 
-pcb-bundle virtex-7-config-data :
-  port D : pin[32]
+;8, 16, or 32 bit width
+pcb-bundle virtex-7-config-data-bus (data-width:Int) :
+  port D : pin[data-width]
+
+pcb-bundle virtex-7-serial-config-data :
+  pin DOUT ; data out
+  pin DIN  ; data in
+
+pcb-bundle virtex-7-spi :
+  pin DOUT ; data out
+  pin FCS  ; chip select
+  pin MOSI ; master-out slave-in
+  pin DIN  ; data in
+
+pcb-bundle virtex-7-select-map-control :
+  pin CSI  ; chip select in
+  pin CSO  ; chip select out
+  pin RDWR ; read/write direction
+
+pcb-bundle virtex-7-bpi-control :
+  pin ADV ; address output valid
+  pin FCS ; chip select
+  pin FOE ; output enable
+  pin FWE ; write enable
+
+pcb-bundle virtex-7-bpi-address :
+  port A : pin[29]
+
+pcb-bundle virtex-7-pull-up-during-config :
+  pin PUDC
+
+pcb-bundle virtex-7-external-master-clock :
+  pin EMCCLK
 
 pcb-bundle virtex-7-revision-select :
   port RS : pin[2]
@@ -183,24 +220,14 @@ pcb-bundle virtex-7-memory-byte-group :
   port P : pin[8]
 
 pcb-bundle virtex-7-memory-byte-group-with-vref :
-  port DQS : diff-pair
-  port P : pin[8]
+  port G : virtex-7-memory-byte-group
   pin VREF
 
-pcb-bundle virtex-7-bpi-control :
-  pin ADV ; address output valid
-  pin FCS ; chip select
-  pin FOE ; output enable
-  pin FWE ; write enable
-
-pcb-bundle virtex-7-bpi-address :
-  port ADDR : pin[[0 to 29]]
-
 pcb-bundle virtex-7-single-region-clock :
-  port SRCC : diff-pair
+  pin SRCC
 
 pcb-bundle virtex-7-multi-region-clock :
-  port MRCC : diff-pair
+  pin MRCC
 
 pcb-bundle virtex-7-dci-vref-n :
   pin VRN
@@ -228,14 +255,22 @@ public defn generate-component (name:String, landpattern-name:String, pinout:Xil
   val outline = ComponentOutline()
   make-dedicated-pin-properties(outline, dedicated-pins)
   val io-bank-ids = make-io-pin-properties(outline, io-pins)
+  make-io-symbol-stmts(outline, io-bank-ids)
   make-io-supports(outline, io-pins, io-bank-ids)
 
   val props-stmt = BodyExpr("pin-properties :",
     ["[ pin:Ref | pads:Ref ... | bank:Int | memory-byte-group:Int ]"],
     seq(to-string, pin-props(outline)))
+  val symbol-stmts = cat-all $ [
+    ["val box = BoxSymbol(self)"],
+    symbol-set-bank-stmts(outline),
+    [BodyExpr("assign-symbols([", symbol-assign-stmts(outline), ["])"])]
+    ]
   val comp-stmt = BodyExpr("pcb-component component :",
     seq(to-string, comp-ports(outline)),
-    [props-stmt, "make-box-symbol()", "assign-landpattern(%_)" % [landpattern-name]]
+    [props-stmt],
+    symbol-stmts,
+    ["assign-landpattern(%_)" % [landpattern-name]]
     )
   val module-stmt = BodyExpr("pcb-module module :",
     seq(to-string, module-ports(outline)),
@@ -275,7 +310,7 @@ defn group-by-name (pins:Seqable<DedicatedXilinxPin>) -> Vector<DedicatedXilinxP
         add(result, p)
   result
 
-;Create rows for the pin properties table and port declarations from the dedicated pins
+;Create pin properties rows, port declarations, and box symbol bank statements from the dedicated pins
 defn make-dedicated-pin-properties (outline:ComponentOutline, pins:Vector<DedicatedXilinxPin>) -> False :
   ;Add a pin properties row
   defn add-pin-prop-row (name:Expr, pads:Tuple<PadRef>, bank:Int) -> False :
@@ -284,6 +319,13 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, pins:Vector<Dedica
   ;Add a port declaration
   defn add-port-decl (name:Expr, type:Expr, indices:Tuple<Int>) -> False :
     add(comp-ports(outline), port-decl-stmt(name, type, indices))
+
+  ;Add a box symbol set-bank statement and assign-symbols statement for a multi-pad pin
+  defn add-multi-pad-symbol-stmts (name:Expr) -> False :
+    val bank-stmt = "set-bank(Ref(\"%_\"), find-pins-by-regex(box, \"%_\\\\[\\\\d+\\\\]\"))" % [name, name]
+    add(symbol-set-bank-stmts(outline), to-string(bank-stmt))
+    val assign-stmt = "Ref(\"%_\") => box" % [name]
+    add(symbol-assign-stmts(outline), to-string(assign-stmt))
 
   ;Add module pin declaration and net loop
   defn add-module-pin-and-net-loop (name:Expr) -> False :
@@ -297,6 +339,9 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, pins:Vector<Dedica
   val gth-banks = IntSet()
   val gtavttrcal-banks = IntSet()
   val gtrref-banks = IntSet()
+
+  ;Add default box symbol bank 0
+  add(symbol-set-bank-stmts(outline), "set-bank(0, pins(self))")
 
   ;Add pin properties row for each pin (multiple rows for multi-pad pins)
   ;Also add port declaration and module net loop for multi-pad pins
@@ -371,6 +416,7 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, pins:Vector<Dedica
           val name+index = "%_[%_]" % [name, i]
           add-pin-prop-row(name+index, [pr], bank)
         add-port-decl(name, "pin", to-tuple(0 to length(pin-refs(p))))
+        add-multi-pad-symbol-stmts(name)
         if name != "NC" : ; do not net no-connect pins together
           add-module-pin-and-net-loop(name)
       else :
@@ -390,8 +436,7 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, pins:Vector<Dedica
       add-port-decl(name, type, to-tuple(banks))
   false
 
-;Create pin properties table rows for IO pins, set the final reference name for each IO pin, and add IO bank port
-;declarations
+;Create IO pin properties rows, set IO pin final reference names, and add IO bank port declarations
 ;Returns the IO bank IDs
 defn make-io-pin-properties (outline:ComponentOutline, pins:Vector<IOXilinxPin>) -> Tuple<Int> :
   ;Group pins by bank
@@ -422,21 +467,35 @@ defn make-io-pin-properties (outline:ComponentOutline, pins:Vector<IOXilinxPin>)
   add(comp-ports(outline), port-decl-stmt("IO", "virtex-7-io-bank", bank-ids))
   bank-ids
 
+;Create IO pin symbol set-bank statements
+defn make-io-symbol-stmts (outline:ComponentOutline, bank-ids:Tuple<Int>) -> False :
+  val bank-ids-for-loop-str = compactify-for-loop-indices(bank-ids)
+  add(symbol-set-bank-stmts(outline), for-stmt("bank", bank-ids-for-loop-str, [
+    "set-bank(Ref(bank), find-pins-by-regex(box, \"IO\\\\[%_\\\\].*\" % [bank]))"
+    ]))
+  for bank in bank-ids do :
+    add(symbol-assign-stmts(outline), "%_ => box" % [bank])
+
 ;Create the support statements for the IO pins
 ;Must be called after final pin references are set (by make-io-pin-properties)
 defn make-io-supports (outline:ComponentOutline, pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> False :
+  defn get-ref (p:IOXilinxPin) -> String :
+    append("comp.", final-ref!(p))
+
   val bank-ids-str = pretty-indices-str(bank-ids)
   val bank-ids-for-loop-str = compactify-for-loop-indices(bank-ids)
 
-  ;Configuration mode pins
-  val config-pins = Array<IOXilinxPin>(32)
+  ;Configuration pins
+  val config-data-bus-pins = Array<IOXilinxPin>(32)
+  ;[PUDC, EMCCLK, CSI, CSO, DOUT, RDWR, MOSI, DIN]
+  val config-data-pins = Array<IOXilinxPin>(8)
 
   ;Revision select
   val rev-sel = Array<IOXilinxPin>(2)
 
   val bpi-addr = Array<IOXilinxPin>(30)
   ;[Address valid, chip select, output enable, write enable]
-  val bpi-extras = Array<IOXilinxPin>(4)
+  val bpi-control-pins = Array<IOXilinxPin>(4)
 
   ;Clocks
   val srcc-pins = HashSet<[Int,Int]>()
@@ -451,20 +510,22 @@ defn make-io-supports (outline:ComponentOutline, pins:Vector<IOXilinxPin>, bank-
         (func:AnalogInputType) :
           ;Handled separately
           false
+        (func:ConfigDataBusType) :
+          config-data-bus-pins[index(func)] = p
         (func:ConfigDataType) :
-          config-pins[index(func)] = p
+          config-data-pins[to-int(type(func))] = p
         (func:RevisionType) :
           rev-sel[index(func)] = p
         (func:BPIAddressType) :
           bpi-addr[index(func)] = p
         (func:BPIAddressValidType) :
-          bpi-extras[0] = p
+          bpi-control-pins[0] = p
         (func:BPIChipSelectType) :
-          bpi-extras[1] = p
+          bpi-control-pins[1] = p
         (func:BPIOutputEnableType) :
-          bpi-extras[2] = p
+          bpi-control-pins[2] = p
         (func:BPIWriteEnableType) :
-          bpi-extras[3] = p
+          bpi-control-pins[3] = p
         (func:SingleRegionClockType) :
           add(srcc-pins, [bank(p), channel(p)])
         (func:MultiRegionClockType) :
@@ -495,32 +556,65 @@ defn make-io-supports (outline:ComponentOutline, pins:Vector<IOXilinxPin>, bank-
     support-stmt("gpio", ["p" => "comp.IO[bank].S[25]"])
     ]))
 
-  ;Configuration data support
-  add(support-stmts(outline), support-stmt("virtex-7-config-data",
-    to-tuple $ for i in 0 to 32 seq :
-      ("D[%_]" % [i]) => append("comp.", final-ref!(config-pins[i]))
-    ))
+  ;Configuration data busses (x8, x16, and x32)
+  for width in [8, 16, 32] do :
+    add(support-stmts(outline), support-stmt("virtex-7-config-data-bus",
+      to-tuple $ for i in 0 to width seq :
+        ("D[%_]" % [i]) => get-ref(config-data-bus-pins[i])
+      params = [to-string(width)]
+      ))
 
-  ;Revision select
-  add(support-stmts(outline), support-stmt("virtex-7-revision-select", [
-    "RS[0]" => append("comp.", final-ref!(rev-sel[0])),
-    "RS[1]" => append("comp.", final-ref!(rev-sel[1])),
+  ;Serial config data
+  add(support-stmts(outline), support-stmt("virtex-7-serial-config-data", [
+    "DOUT" => get-ref(config-data-pins[to-int(CONFIG-DOUT)]),
+    "DIN" => get-ref(config-data-pins[to-int(CONFIG-DIN)])
     ]))
 
-  ;Byte peripheral interface supports
+  ;SPI
+  add(support-stmts(outline), support-stmt("virtex-7-spi", [
+    "DOUT" => get-ref(config-data-pins[to-int(CONFIG-DOUT)]),
+    "FCS" => get-ref(bpi-control-pins[1]),
+    "MOSI" => get-ref(config-data-pins[to-int(CONFIG-MOSI)]),
+    "DIN" => get-ref(config-data-pins[to-int(CONFIG-DIN)])
+    ]))
+
+  ;SelectMAP
+  add(support-stmts(outline), support-stmt("virtex-7-select-map-control", [
+    "CSI" => get-ref(config-data-pins[to-int(CONFIG-CSI)]),
+    "CSO" => get-ref(config-data-pins[to-int(CONFIG-CSO)]),
+    "RDWR" => get-ref(config-data-pins[to-int(CONFIG-RDWR)])
+    ]))
+
+  ;BPI
   add(support-stmts(outline), support-stmt("virtex-7-bpi-control", [
-    "ADV" => append("comp.", final-ref!(bpi-extras[0])),
-    "FCS" => append("comp.", final-ref!(bpi-extras[1])),
-    "FOE" => append("comp.", final-ref!(bpi-extras[2])),
-    "FWE" => append("comp.", final-ref!(bpi-extras[3]))
+    "ADV" => get-ref(bpi-control-pins[0]),
+    "FCS" => get-ref(bpi-control-pins[1]),
+    "FOE" => get-ref(bpi-control-pins[2]),
+    "FWE" => get-ref(bpi-control-pins[3])
     ]))
   add(support-stmts(outline), support-stmt("virtex-7-bpi-address",
     to-tuple $ for i in 0 to 29 seq :
-      ("ADDR[%_]" % [i]) => append("comp.", final-ref!(bpi-addr[i]))
+      ("ADDR[%_]" % [i]) => get-ref(bpi-addr[i])
     ))
 
+  ;Pull-up during configuration
+  add(support-stmts(outline), support-stmt("virtex-7-pull-up-during-config", [
+    "PUDC" => get-ref(config-data-pins[to-int(CONFIG-PUDC)]),
+    ]))
+
+  ;External master clock
+  add(support-stmts(outline), support-stmt("virtex-7-external-master-clock", [
+    "EMCCLK" => get-ref(config-data-pins[to-int(CONFIG-EMCCLK)]),
+    ]))
+
+  ;Revision select
+  add(support-stmts(outline), support-stmt("virtex-7-revision-select", [
+    "RS[0]" => get-ref(rev-sel[0]),
+    "RS[1]" => get-ref(rev-sel[1]),
+    ]))
+
   ;VREF supports
-  val vref-pin-names = seq({append("comp.", final-ref!(_))}, vref-pins)
+  val vref-pin-names = seq(get-ref, vref-pins)
   add(support-stmts(outline), for-stmt("p", to-string("[%,]" % [vref-pin-names]), [
     support-stmt("virtex-7-vref", [
       "VREF" => "p"
@@ -530,14 +624,16 @@ defn make-io-supports (outline:ComponentOutline, pins:Vector<IOXilinxPin>, bank-
   add(support-stmts(outline), for-stmt("bank-and-channel", to-string(qsort(srcc-pins, compare)), [
     "val [bank, channel] = bank-and-channel",
     support-stmt("virtex-7-single-region-clock", [
-      "SRCC.P" => "comp.IO[bank].D[channel].P",
-      "SRCC.N" => "comp.IO[bank].D[channel].N"])
+      "SRCC" => "comp.IO[bank].D[channel].P"])
+    support-stmt("virtex-7-single-region-clock", [
+      "SRCC" => "comp.IO[bank].D[channel].N"])
     ]))
   add(support-stmts(outline), for-stmt("bank-and-channel", to-string(qsort(mrcc-pins, compare)), [
     "val [bank, channel] = bank-and-channel",
     support-stmt("virtex-7-multi-region-clock", [
-      "MRCC.P" => "comp.IO[bank].D[channel].P",
-      "MRCC.N" => "comp.IO[bank].D[channel].N"])
+      "MRCC" => "comp.IO[bank].D[channel].P"])
+    support-stmt("virtex-7-multi-region-clock", [
+      "MRCC" => "comp.IO[bank].D[channel].N"])
     ]))
 
   add-all(support-stmts(outline), make-adc-supports(pins))
