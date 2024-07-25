@@ -123,19 +123,19 @@ defn port-decl-stmt (name:Expr, type:Expr, indices:Tuple<Int>) -> Expr :
 
 ;Create a net statement for a multi-pin port
 defn port-net-loop-stmt (name:Expr) -> Expr :
-  for-stmt("p", "comp.%_" % [name], ["net (%_ p)" % [name]])
+  for-stmt("p", "pins(comp.%_)" % [name], ["net (%_ p)" % [name]])
 
 ;Create a supports statement
 ;The body of the supports will contain "name.key(pair) => value(pair)" for each pair in 'support-pairs'
 ;Do not include the bundle name in the key
 defn support-stmt (name:Expr, support-pairs:Seqable<KeyValue<Expr,Expr>> -- params:Tuple<Expr> = []) -> Expr :
-  val body = to-tuple $ for pair in support-pairs seq :
-    to-string("%_.%_ => %_" % [name, key(pair), value(pair)])
-  val param-str =
+  val name* =
     if length(params) > 0 :
-      "(%,)" % [params]
-    else : ""
-  BodyExpr(to-string("supports %_%_ :" % [name, param-str]), body)
+      to-string $ "%_(%,)" % [name, params]
+    else : name
+  val body = to-tuple $ for pair in support-pairs seq :
+    to-string("%_.%_ => %_" % [name*, key(pair), value(pair)])
+  BodyExpr(to-string("supports %_ :" % [name*]), body)
 
 ;============================================================
 ;======================== Generator =========================
@@ -152,6 +152,7 @@ defpackage components/%_ :
   import jsl/bundles
   import jsl/bundles/debug
   import jsl/symbols/box-symbol
+  import landpatterns/%_
 
 pcb-bundle virtex-7-io-bank :
   port S : pin[[0 25]]
@@ -195,7 +196,7 @@ pcb-bundle virtex-7-bpi-control :
   pin FWE ; write enable
 
 pcb-bundle virtex-7-bpi-address :
-  port A : pin[29]
+  port ADDR : pin[29]
 
 pcb-bundle virtex-7-pull-up-during-config :
   pin PUDC
@@ -276,13 +277,13 @@ public defn generate-component (name:String, landpattern-name:String, pinout:Xil
     seq(to-string, module-ports(outline)),
     ["", "inst comp : component", ""],
     seq(to-string, module-nets(outline)),
-    ["", "make-supports()"]
+    ["", "make-supports(comp)"]
   )
-  val supports-stmt = BodyExpr("defn make-supports () :", [
+  val supports-stmt = BodyExpr("defn make-supports (comp) :", [
     BodyExpr("inside pcb-module :",
       to-tuple(seq(to-string, support-stmts(outline))))])
 
-  to-string $ SIMPLE-TMPLT % [name, comp-stmt, module-stmt, supports-stmt]
+  to-string $ SIMPLE-TMPLT % [name, landpattern-name, comp-stmt, module-stmt, supports-stmt]
 
 ;============================================================
 ;========================= Helpers ==========================
@@ -342,6 +343,7 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, pins:Vector<Dedica
 
   ;Add default box symbol bank 0
   add(symbol-set-bank-stmts(outline), "set-bank(0, pins(self))")
+  add(symbol-assign-stmts(outline), "0 => box")
 
   ;Add pin properties row for each pin (multiple rows for multi-pad pins)
   ;Also add port declaration and module net loop for multi-pad pins
@@ -471,7 +473,7 @@ defn make-io-pin-properties (outline:ComponentOutline, pins:Vector<IOXilinxPin>)
 defn make-io-symbol-stmts (outline:ComponentOutline, bank-ids:Tuple<Int>) -> False :
   val bank-ids-for-loop-str = compactify-for-loop-indices(bank-ids)
   add(symbol-set-bank-stmts(outline), for-stmt("bank", bank-ids-for-loop-str, [
-    "set-bank(Ref(bank), find-pins-by-regex(box, \"IO\\\\[%_\\\\].*\" % [bank]))"
+    "set-bank(bank, find-pins-by-regex(box, to-string(\"IO\\\\[%_\\\\].*\" % [bank])))"
     ]))
   for bank in bank-ids do :
     add(symbol-assign-stmts(outline), "%_ => box" % [bank])
@@ -546,14 +548,14 @@ defn make-io-supports (outline:ComponentOutline, pins:Vector<IOXilinxPin>, bank-
 
   ;GPIO support
   add(support-stmts(outline), for-stmt("bank", bank-ids-for-loop-str, [
-    support-stmt("gpio", ["p" => "comp.IO[bank].S[0]"])
+    support-stmt("gpio", ["gpio" => "comp.IO[bank].S[0]"])
     for-stmt("channel", "1 through 24", [
       support-stmt("virtex-7-diff-gpio", [
         "D.P" => "comp.IO[bank].D[channel].P"
         "D.N" => "comp.IO[bank].D[channel].N"
         ])
       ])
-    support-stmt("gpio", ["p" => "comp.IO[bank].S[25]"])
+    support-stmt("gpio", ["gpio" => "comp.IO[bank].S[25]"])
     ]))
 
   ;Configuration data busses (x8, x16, and x32)
@@ -757,12 +759,12 @@ defn make-memory-byte-group-supports (pins:Vector<IOXilinxPin>, bank-ids:Tuple<I
         "  (property?(p.memory-byte-group) == One(group))"
         ]),
       BodyExpr("supports virtex-7-memory-byte-group :", [
-        "require clk:virtex-7-memory-strobe from comp",
+        "require clk:virtex-7-memory-strobe from self",
         "restrict(clk.DQS.P, match-bank-group)",
         "virtex-7-memory-byte-group.DQS.P => clk.DQS.P",
         "virtex-7-memory-byte-group.DQS.N => clk.DQS.N",
         for-stmt("i", "0 to 8", [
-          "require p:virtex-7-memory-byte-pin from comp",
+          "require p:virtex-7-memory-byte-pin from self",
           "restrict(p.MBP, match-bank-group)"
           "virtex-7-memory-byte-group.P[i] => p.MBP"
           ])
@@ -770,22 +772,18 @@ defn make-memory-byte-group-supports (pins:Vector<IOXilinxPin>, bank-ids:Tuple<I
       ])
     ])
   for-stmt("bank", bank-ids-for-loop-str, [
-    for-stmt("group", "0 to 4", [
-      BodyExpr("defn match-bank-group (p) :", ["(property?(p.bank) == One(bank)) and (property?(p.memory-byte-group) == One(group))"]),
-      BodyExpr("supports virtex-7-memory-byte-group-with-vref :", [
-        "require clk:virtex-7-memory-strobe from comp",
-        "restrict(clk.DQS.P, match-bank-group)",
-        "virtex-7-memory-byte-group-with-vref.DQS.P => clk.DQS.P",
-        "virtex-7-memory-byte-group-with-vref.DQS.N => clk.DQS.N",
-        for-stmt("i", "0 to 8", [
-          "require p:virtex-7-memory-byte-pin from comp",
-          "restrict(p.MBP, match-bank-group)"
-          "virtex-7-memory-byte-group-with-vref.P[i] => p.MBP"
-          ])
-        "require v:virtex-7-vref from comp",
-        "restrict(v.VREF, fn (p) : property?(p.bank) == One(bank))",
-        "virtex-7-memory-byte-group-with-vref.VREF => v.VREF"
-        ])
+    BodyExpr("defn match-bank (p) :", ["property?(p.bank) == One(bank)"]),
+    BodyExpr("supports virtex-7-memory-byte-group-with-vref :", [
+      "require grp:virtex-7-memory-byte-group from self",
+      "restrict(grp.P[0], match-bank)",
+      "virtex-7-memory-byte-group-with-vref.G.DQS.P => grp.DQS.P",
+      "virtex-7-memory-byte-group-with-vref.G.DQS.N => grp.DQS.N",
+      for-stmt("i", "0 to 8", [
+        "virtex-7-memory-byte-group-with-vref.G.P[i] => grp.P[i]"
+        ]),
+      "require v:virtex-7-vref from self",
+      "restrict(v.VREF, match-bank)",
+      "virtex-7-memory-byte-group-with-vref.VREF => v.VREF"
       ])
     ])
   ]
