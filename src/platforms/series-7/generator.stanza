@@ -74,8 +74,6 @@ defn PadRef (ref-str:String) -> PadRef :
 defstruct ComponentOutline :
   comp-ports:Vector<Expr> with: (init => Vector<Expr>())
   pin-props:Vector<Expr> with: (init => Vector<Expr>())
-  symbol-set-bank-stmts:Vector<Expr> with: (init => Vector<Expr>())
-  symbol-assign-stmts:Vector<Expr> with: (init => Vector<Expr>())
   module-ports:Vector<Expr> with: (init => Vector<Expr>())
   module-nets:Vector<Expr> with: (init => Vector<Expr>())
   support-stmts:Vector<Expr> with: (init => Vector<Expr>())
@@ -109,8 +107,12 @@ defn for-stmt (for-vars:Seqable<Expr>, for-lists:Seqable<Expr>, body:Seqable<Exp
   BodyExpr(to-string("for (%,) do :" % [var-strs]), body)
 
 ;Create a pin properties table row
-defn pin-props-stmt (name:Expr, pads:Tuple<PadRef>, bank:Int, mem-byte-grp:Maybe<Int> = None()) -> Expr :
-  "[ %_ | %* | %_ | %_ ]" % [name, join(pads, " "), bank, maybe-default(mem-byte-grp, "-")]
+defn pin-props-stmt (name:Expr, pads:Tuple<PadRef>, bank:Int --
+                     symbol-bank:Maybe<Expr> = None(),
+                     mem-byte-grp:Maybe<Int> = None()) -> Expr :
+  val sb-str = maybe-default(symbol-bank, bank)
+  val mbg-str = maybe-default(mem-byte-grp, "-")
+  "[ %_ | %* | %_ | (Ref(`%_)) | %_ ]" % [name, join(pads, " "), bank, sb-str, mbg-str]
 
 ;Create a pin declaration
 defn pin-decl-stmt (name:Expr) -> Expr :
@@ -256,16 +258,19 @@ public defn generate-component (name:String, landpattern-name:String, pinout:Xil
   val outline = ComponentOutline()
   make-dedicated-pin-properties(outline, dedicated-pins)
   val io-bank-ids = make-io-pin-properties(outline, io-pins)
-  make-io-symbol-stmts(outline, io-bank-ids)
   make-io-supports(outline, io-pins, io-bank-ids)
 
   val props-stmt = BodyExpr("pin-properties :",
-    ["[ pin:Ref | pads:Ref ... | bank:Int | memory-byte-group:Int ]"],
+    ["[ pin:Ref | pads:Ref ... | bank:Int | symbol-bank:Ref | memory-byte-group:Int ]"],
     seq(to-string, pin-props(outline)))
-  val symbol-stmts = cat-all $ [
-    ["val box = BoxSymbol(self)"],
-    symbol-set-bank-stmts(outline),
-    [BodyExpr("assign-symbols([", symbol-assign-stmts(outline), ["])"])]
+  val symbol-stmts = [
+    "val box = BoxSymbol(self)",
+    "val unique-sym-banks = HashSet<Ref>()"
+    for-stmt("p", "pins(self)", [
+      "val sym-bank = property(p.symbol-bank)",
+      "set-bank(sym-bank, p)",
+      "add(unique-sym-banks, sym-bank)"])
+    "assign-symbols(seq({_ => box}, unique-sym-banks))"
     ]
   val comp-stmt = BodyExpr("pcb-component component :",
     seq(to-string, comp-ports(outline)),
@@ -311,22 +316,15 @@ defn group-by-name (pins:Seqable<DedicatedXilinxPin>) -> Vector<DedicatedXilinxP
         add(result, p)
   result
 
-;Create pin properties rows, port declarations, and box symbol bank statements from the dedicated pins
+;Create pin properties rows and port declarations from the dedicated pins
 defn make-dedicated-pin-properties (outline:ComponentOutline, pins:Vector<DedicatedXilinxPin>) -> False :
   ;Add a pin properties row
-  defn add-pin-prop-row (name:Expr, pads:Tuple<PadRef>, bank:Int) -> False :
-    add(pin-props(outline), pin-props-stmt(name, pads, bank))
+  defn add-pin-prop-row (name:Expr, pads:Tuple<PadRef>, bank:Int -- symbol-bank:Maybe<Expr> = None()) -> False :
+    add(pin-props(outline), pin-props-stmt(name, pads, bank, symbol-bank = symbol-bank))
 
   ;Add a port declaration
   defn add-port-decl (name:Expr, type:Expr, indices:Tuple<Int>) -> False :
     add(comp-ports(outline), port-decl-stmt(name, type, indices))
-
-  ;Add a box symbol set-bank statement and assign-symbols statement for a multi-pad pin
-  defn add-multi-pad-symbol-stmts (name:Expr) -> False :
-    val bank-stmt = "set-bank(Ref(\"%_\"), find-pins-by-regex(box, \"%_\\\\[\\\\d+\\\\]\"))" % [name, name]
-    add(symbol-set-bank-stmts(outline), to-string(bank-stmt))
-    val assign-stmt = "Ref(\"%_\") => box" % [name]
-    add(symbol-assign-stmts(outline), to-string(assign-stmt))
 
   ;Add module pin declaration and net loop
   defn add-module-pin-and-net-loop (name:Expr) -> False :
@@ -340,10 +338,6 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, pins:Vector<Dedica
   val gth-banks = IntSet()
   val gtavttrcal-banks = IntSet()
   val gtrref-banks = IntSet()
-
-  ;Add default box symbol bank 0
-  add(symbol-set-bank-stmts(outline), "set-bank(0, pins(self))")
-  add(symbol-assign-stmts(outline), "0 => box")
 
   ;Add pin properties row for each pin (multiple rows for multi-pad pins)
   ;Also add port declaration and module net loop for multi-pad pins
@@ -416,9 +410,8 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, pins:Vector<Dedica
         ;Multi-pad pin
         for (i in 0 to false, pr in pin-refs(p)) do :
           val name+index = "%_[%_]" % [name, i]
-          add-pin-prop-row(name+index, [pr], bank)
+          add-pin-prop-row(name+index, [pr], bank, symbol-bank = One(name))
         add-port-decl(name, "pin", to-tuple(0 to length(pin-refs(p))))
-        add-multi-pad-symbol-stmts(name)
         if name != "NC" : ; do not net no-connect pins together
           add-module-pin-and-net-loop(name)
       else :
@@ -463,20 +456,11 @@ defn make-io-pin-properties (outline:ComponentOutline, pins:Vector<IOXilinxPin>)
           (_:Diff-N) : "N"
           (_) : throw(Exception("Channel %_ of bank %_ is not a differential pair" % [cid, bid]))
         set-final-ref(p, to-string("IO[%_].D[%_].%_" % [bid, cid, pol-str]))
-      add(pin-props(outline), pin-props-stmt(final-ref!(p), [pin-ref(p)], bid, mem-byte-grp(p)))
+      add(pin-props(outline), pin-props-stmt(final-ref!(p), [pin-ref(p)], bid, mem-byte-grp = mem-byte-grp(p)))
 
   val bank-ids = qsort(keys(banks))
   add(comp-ports(outline), port-decl-stmt("IO", "virtex-7-io-bank", bank-ids))
   bank-ids
-
-;Create IO pin symbol set-bank statements
-defn make-io-symbol-stmts (outline:ComponentOutline, bank-ids:Tuple<Int>) -> False :
-  val bank-ids-for-loop-str = compactify-for-loop-indices(bank-ids)
-  add(symbol-set-bank-stmts(outline), for-stmt("bank", bank-ids-for-loop-str, [
-    "set-bank(bank, find-pins-by-regex(box, to-string(\"IO\\\\[%_\\\\].*\" % [bank])))"
-    ]))
-  for bank in bank-ids do :
-    add(symbol-assign-stmts(outline), "%_ => box" % [bank])
 
 ;Create the support statements for the IO pins
 ;Must be called after final pin references are set (by make-io-pin-properties)
