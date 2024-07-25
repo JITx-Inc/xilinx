@@ -1,0 +1,35 @@
+#use-added-syntax(jitx)
+defpackage landpatterns/flg1925-bga :
+  import core
+  import jitx
+  import jitx/commands
+
+  import jsl/design/settings
+  import jsl/landpatterns
+  import jsl/landpatterns/BGA/pads
+  import jsl/landpatterns/pad-planner
+  import jsl/landpatterns/pad-island
+
+; Xilinx FLG1925
+; https://docs.amd.com/v/u/en-US/ug475_7Series_Pkg_Pinout
+
+public val flg1925-bga = create-landpattern $
+  new BGA :
+    defmethod num-leads (this) : 44 * 44
+    defmethod rows (this) : 44
+    defmethod columns (this) : 44
+    defmethod lead-diam (this) : 0.6
+    defmethod pitch (this) : 1.0
+    defmethod density-level (this) : DensityLevelC
+    defmethod pad-planner (this) :
+      Corner-Cut-Matrix-Planner(
+        rows = rows(this),
+        columns = columns(this),
+        corner-cut = 2)
+    defmethod lead-numbering (this) :
+      Grid-Numbering(rows(this), columns(this))
+    defmethod package-body (this) :
+      PackageBody(
+        width = typ(45.0),
+        length = typ(45.0),
+        height = min-max(2.85, 3.15))

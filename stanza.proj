@@ -6,6 +6,8 @@ pkg-cache: ".slm/pkg-cache"
 packages xilinx/* defined-in "src/"
 packages xilinx/tests/* defined-in "tests/"
 
+packages landpatterns/* defined-in "landpatterns/"
+
 build-test tests:
   inputs: xilinx/tests/pinouts
   pkg: ".slm/pkgs"
