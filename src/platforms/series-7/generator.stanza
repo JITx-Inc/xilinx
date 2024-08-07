@@ -77,6 +77,7 @@ defstruct ComponentOutline :
   module-ports:Vector<Expr> with: (init => Vector<Expr>())
   module-nets:Vector<Expr> with: (init => Vector<Expr>())
   support-stmts:Vector<Expr> with: (init => Vector<Expr>())
+  support-funcs:Vector<Expr> with: (init => Vector<Expr>())
 
 ;Generated code statement or group of statements
 deftype Expr :
@@ -107,16 +108,18 @@ defn for-stmt (for-vars:Seqable<Expr>, for-lists:Seqable<Expr>, body:Seqable<Exp
   BodyExpr(to-string("for (%,) do :" % [var-strs]), body)
 
 ;Create a pin properties table row
-defn pin-props-stmt (name:Expr, pads:Tuple<PadRef>, bank:Int --
+defn pin-props-stmt (name:Expr, pads:Tuple<PadRef>, xilinx-bank:Int --
                      symbol-bank:Maybe<Expr> = None(),
                      mem-byte-grp:Maybe<Int> = None()) -> Expr :
-  val sb-str = maybe-default(symbol-bank, bank)
+  val symbol-bank-str = match(symbol-bank) :
+    (b:One<Expr>) : to-string("(Ref(`%_))" % [value(b)])
+    (_) : to-string(xilinx-bank)
   val mbg-str = maybe-default(mem-byte-grp, "-")
-  "[ %_ | %* | %_ | (Ref(`%_)) | %_ ]" % [name, join(pads, " "), bank, sb-str, mbg-str]
+  "[ %_ | %* | %_ | %_ | %_ ]" % [name, join(pads, " "), symbol-bank-str, xilinx-bank, mbg-str]
 
 ;Create a pin declaration
 defn pin-decl-stmt (name:Expr) -> Expr :
-  "pin %_" % [name]
+  "port %_ : pin" % [name]
 
 ;Create a port declaration
 defn port-decl-stmt (name:Expr, type:Expr, indices:Tuple<Int>) -> Expr :
@@ -148,95 +151,19 @@ val SIMPLE-TMPLT =
 defpackage components/%_ :
   import core
   import collections
+
   import jitx
   import jitx/commands
+
   import jsl/design/settings
   import jsl/bundles
   import jsl/bundles/debug
   import jsl/symbols/box-symbol
+
+  import xilinx/platforms/series-7/bundles
   import landpatterns/%_
 
-pcb-bundle virtex-7-io-bank :
-  port S : pin[[0 25]]
-  port D : diff-pair[[1 through 24]]
-
-pcb-bundle virtex-7-gt-quad :
-  port C : lane-pair[4]
-
-pcb-bundle virtex-7-gt-clock :
-  port I : diff-pair[2]
-
-pcb-bundle virtex-7-diff-gpio :
-  port D : diff-pair
-
-pcb-bundle virtex-7-adc :
-  port ADC : diff-pair
-
-;8, 16, or 32 bit width
-pcb-bundle virtex-7-config-data-bus (data-width:Int) :
-  port D : pin[data-width]
-
-pcb-bundle virtex-7-serial-config-data :
-  pin DOUT ; data out
-  pin DIN  ; data in
-
-pcb-bundle virtex-7-spi :
-  pin DOUT ; data out
-  pin FCS  ; chip select
-  pin MOSI ; master-out slave-in
-  pin DIN  ; data in
-
-pcb-bundle virtex-7-select-map-control :
-  pin CSI  ; chip select in
-  pin CSO  ; chip select out
-  pin RDWR ; read/write direction
-
-pcb-bundle virtex-7-bpi-control :
-  pin ADV ; address output valid
-  pin FCS ; chip select
-  pin FOE ; output enable
-  pin FWE ; write enable
-
-pcb-bundle virtex-7-bpi-address :
-  port ADDR : pin[29]
-
-pcb-bundle virtex-7-pull-up-during-config :
-  pin PUDC
-
-pcb-bundle virtex-7-external-master-clock :
-  pin EMCCLK
-
-pcb-bundle virtex-7-revision-select :
-  port RS : pin[2]
-
-pcb-bundle virtex-7-vref :
-  pin VREF
-
-pcb-bundle virtex-7-memory-strobe :
-  port DQS : diff-pair
-
-pcb-bundle virtex-7-memory-byte-pin :
-  pin MBP
-
-pcb-bundle virtex-7-memory-byte-group :
-  port DQS : diff-pair
-  port P : pin[8]
-
-pcb-bundle virtex-7-memory-byte-group-with-vref :
-  port G : virtex-7-memory-byte-group
-  pin VREF
-
-pcb-bundle virtex-7-single-region-clock :
-  pin SRCC
-
-pcb-bundle virtex-7-multi-region-clock :
-  pin MRCC
-
-pcb-bundle virtex-7-dci-vref-n :
-  pin VRN
-
-pcb-bundle virtex-7-dci-vref-p :
-  pin VRP
+%_
 
 %_
 
@@ -258,37 +185,48 @@ public defn generate-component (name:String, landpattern-name:String, pinout:Xil
   val outline = ComponentOutline()
   make-dedicated-pin-properties(outline, dedicated-pins)
   val io-bank-ids = make-io-pin-properties(outline, io-pins)
-  make-io-supports(outline, io-pins, io-bank-ids)
+  make-supports(outline, io-pins, io-bank-ids)
 
   val props-stmt = BodyExpr("pin-properties :",
-    ["[ pin:Ref | pads:Ref ... | bank:Int | symbol-bank:Ref | memory-byte-group:Int ]"],
+    ["[ pin:Ref | pads:Ref ... | bank:(Ref|Int) | xilinx-bank:Int | memory-byte-group:Int ]"],
     seq(to-string, pin-props(outline)))
   val symbol-stmts = [
     "val box = BoxSymbol(self)",
-    "val unique-sym-banks = HashSet<Ref>()"
-    for-stmt("p", "pins(self)", [
-      "val sym-bank = property(p.symbol-bank)",
-      "set-bank(sym-bank, p)",
-      "add(unique-sym-banks, sym-bank)"])
+    BodyExpr("val unique-sym-banks = to-tuple $ unique $ for p in pins(self) seq :",
+      ["property(p.bank)"])
+    BodyExpr("property(self.bank-mappings) = to-tuple $ for (i in 0 to false, sym in unique-sym-banks) seq :",
+      ["sym => i"])
     "assign-symbols(seq({_ => box}, unique-sym-banks))"
     ]
-  val comp-stmt = BodyExpr("pcb-component component :",
+  val comp-stmt = BodyExpr("protected pcb-component component :",
     seq(to-string, comp-ports(outline)),
     [props-stmt],
     symbol-stmts,
     ["assign-landpattern(%_)" % [landpattern-name]]
     )
-  val module-stmt = BodyExpr("pcb-module module :",
+  val module-stmt = BodyExpr("protected pcb-module module :",
     seq(to-string, module-ports(outline)),
-    ["", "inst comp : component", ""],
+    ["",
+      "inst comp : component",
+      "val bank-mappings = property(comp.bank-mappings)"
+      for-stmt("bank-mapping", "bank-mappings", [
+        BodyExpr("schematic-group(comp, value(bank-mapping)) = (", [
+          BodyExpr("match(key(bank-mapping)) :", [
+            "(r:Ref) : r"
+            "(i:Int) : IndexRef(Ref(`bank), i))"
+            ])
+          ])
+        ])
+      ""],
     seq(to-string, module-nets(outline)),
     ["", "make-supports(comp)"]
   )
-  val supports-stmt = BodyExpr("defn make-supports (comp) :", [
-    BodyExpr("inside pcb-module :",
-      to-tuple(seq(to-string, support-stmts(outline))))])
+  val supports-stmt = BodyExpr("defn make-supports (comp:Instance) :",
+    to-tuple(seq(to-string, support-stmts(outline))))
+  val support-funcs = string-join(support-funcs(outline), "\n\n")
 
-  to-string $ SIMPLE-TMPLT % [name, landpattern-name, comp-stmt, module-stmt, supports-stmt]
+  to-string $ SIMPLE-TMPLT % [name, landpattern-name, comp-stmt, module-stmt,
+    supports-stmt, support-funcs]
 
 ;============================================================
 ;========================= Helpers ==========================
@@ -319,8 +257,8 @@ defn group-by-name (pins:Seqable<DedicatedXilinxPin>) -> Vector<DedicatedXilinxP
 ;Create pin properties rows and port declarations from the dedicated pins
 defn make-dedicated-pin-properties (outline:ComponentOutline, pins:Vector<DedicatedXilinxPin>) -> False :
   ;Add a pin properties row
-  defn add-pin-prop-row (name:Expr, pads:Tuple<PadRef>, bank:Int -- symbol-bank:Maybe<Expr> = None()) -> False :
-    add(pin-props(outline), pin-props-stmt(name, pads, bank, symbol-bank = symbol-bank))
+  defn add-pin-prop-row (name:Expr, pads:Tuple<PadRef>, xilinx-bank:Int -- symbol-bank:Maybe<Expr> = None()) -> False :
+    add(pin-props(outline), pin-props-stmt(name, pads, xilinx-bank, symbol-bank = symbol-bank))
 
   ;Add a port declaration
   defn add-port-decl (name:Expr, type:Expr, indices:Tuple<Int>) -> False :
@@ -464,7 +402,7 @@ defn make-io-pin-properties (outline:ComponentOutline, pins:Vector<IOXilinxPin>)
 
 ;Create the support statements for the IO pins
 ;Must be called after final pin references are set (by make-io-pin-properties)
-defn make-io-supports (outline:ComponentOutline, pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> False :
+defn make-supports (outline:ComponentOutline, pins:Vector<IOXilinxPin>, bank-ids:Tuple<Int>) -> False :
   defn get-ref (p:IOXilinxPin) -> String :
     append("comp.", final-ref!(p))
 
@@ -530,102 +468,117 @@ defn make-io-supports (outline:ComponentOutline, pins:Vector<IOXilinxPin>, bank-
         (func) :
           throw(Exception("Unexpected IO special function type %_" % [func]))
 
+  defn add-support-func (name:String, stmts:Seqable<Expr>) -> False :
+    add(support-stmts(outline), "make-%_-supports(comp)" % [name])
+    add(support-funcs(outline), BodyExpr("defn make-%_-supports (comp:Instance) :" % [name],
+      [BodyExpr("inside pcb-module :", to-tuple(stmts))]))
+
+  ;Dedicated pin supports
+  add-support-func("dedicated", [
+    ;Serial config data
+    support-stmt("virtex-7-serial-config-data", [
+      "DOUT" => get-ref(config-data-pins[to-int(CONFIG-DOUT)]),
+      "DIN" => get-ref(config-data-pins[to-int(CONFIG-DIN)])
+      ]),
+
+    ;SPI
+    support-stmt("virtex-7-spi", [
+      "DOUT" => get-ref(config-data-pins[to-int(CONFIG-DOUT)]),
+      "FCS" => get-ref(bpi-control-pins[1]),
+      "MOSI" => get-ref(config-data-pins[to-int(CONFIG-MOSI)]),
+      "DIN" => get-ref(config-data-pins[to-int(CONFIG-DIN)])
+      ])
+
+    ;SelectMAP
+    support-stmt("virtex-7-select-map-control", [
+      "CSI" => get-ref(config-data-pins[to-int(CONFIG-CSI)]),
+      "CSO" => get-ref(config-data-pins[to-int(CONFIG-CSO)]),
+      "RDWR" => get-ref(config-data-pins[to-int(CONFIG-RDWR)])
+      ])
+
+    ;BPI
+    support-stmt("virtex-7-bpi-control", [
+      "ADV" => get-ref(bpi-control-pins[0]),
+      "FCS" => get-ref(bpi-control-pins[1]),
+      "FOE" => get-ref(bpi-control-pins[2]),
+      "FWE" => get-ref(bpi-control-pins[3])
+      ])
+    support-stmt("virtex-7-bpi-address",
+      to-tuple $ for i in 0 to 29 seq :
+        ("ADDR[%_]" % [i]) => get-ref(bpi-addr[i])
+      )
+
+    ;Pull-up during configuration
+    support-stmt("virtex-7-pull-up-during-config", [
+      "PUDC" => get-ref(config-data-pins[to-int(CONFIG-PUDC)]),
+      ])
+
+    ;External master clock
+    support-stmt("virtex-7-external-master-clock", [
+      "EMCCLK" => get-ref(config-data-pins[to-int(CONFIG-EMCCLK)]),
+      ])
+
+    ;Revision select
+    support-stmt("virtex-7-revision-select", [
+      "RS[0]" => get-ref(rev-sel[0]),
+      "RS[1]" => get-ref(rev-sel[1]),
+      ])
+    ])
+
   ;GPIO support
-  add(support-stmts(outline), for-stmt("bank", bank-ids-for-loop-str, [
+  val gpio-stmt = for-stmt("bank", bank-ids-for-loop-str, [
     support-stmt("gpio", ["gpio" => "comp.IO[bank].S[0]"])
     for-stmt("channel", "1 through 24", [
-      support-stmt("virtex-7-diff-gpio", [
-        "D.P" => "comp.IO[bank].D[channel].P"
-        "D.N" => "comp.IO[bank].D[channel].N"
+      support-stmt("diff-gpio", [
+        "diff-gpio.P" => "comp.IO[bank].D[channel].P"
+        "diff-gpio.N" => "comp.IO[bank].D[channel].N"
         ])
       ])
     support-stmt("gpio", ["gpio" => "comp.IO[bank].S[25]"])
-    ]))
+    ])
+  add-support-func("gpio", [gpio-stmt])
 
   ;Configuration data busses (x8, x16, and x32)
-  for width in [8, 16, 32] do :
-    add(support-stmts(outline), support-stmt("virtex-7-config-data-bus",
+  val config-data-bus-stmts = to-tuple $ for width in [8, 16, 32] seq :
+    support-stmt("virtex-7-config-data-bus",
       to-tuple $ for i in 0 to width seq :
         ("D[%_]" % [i]) => get-ref(config-data-bus-pins[i])
       params = [to-string(width)]
-      ))
-
-  ;Serial config data
-  add(support-stmts(outline), support-stmt("virtex-7-serial-config-data", [
-    "DOUT" => get-ref(config-data-pins[to-int(CONFIG-DOUT)]),
-    "DIN" => get-ref(config-data-pins[to-int(CONFIG-DIN)])
-    ]))
-
-  ;SPI
-  add(support-stmts(outline), support-stmt("virtex-7-spi", [
-    "DOUT" => get-ref(config-data-pins[to-int(CONFIG-DOUT)]),
-    "FCS" => get-ref(bpi-control-pins[1]),
-    "MOSI" => get-ref(config-data-pins[to-int(CONFIG-MOSI)]),
-    "DIN" => get-ref(config-data-pins[to-int(CONFIG-DIN)])
-    ]))
-
-  ;SelectMAP
-  add(support-stmts(outline), support-stmt("virtex-7-select-map-control", [
-    "CSI" => get-ref(config-data-pins[to-int(CONFIG-CSI)]),
-    "CSO" => get-ref(config-data-pins[to-int(CONFIG-CSO)]),
-    "RDWR" => get-ref(config-data-pins[to-int(CONFIG-RDWR)])
-    ]))
-
-  ;BPI
-  add(support-stmts(outline), support-stmt("virtex-7-bpi-control", [
-    "ADV" => get-ref(bpi-control-pins[0]),
-    "FCS" => get-ref(bpi-control-pins[1]),
-    "FOE" => get-ref(bpi-control-pins[2]),
-    "FWE" => get-ref(bpi-control-pins[3])
-    ]))
-  add(support-stmts(outline), support-stmt("virtex-7-bpi-address",
-    to-tuple $ for i in 0 to 29 seq :
-      ("ADDR[%_]" % [i]) => get-ref(bpi-addr[i])
-    ))
-
-  ;Pull-up during configuration
-  add(support-stmts(outline), support-stmt("virtex-7-pull-up-during-config", [
-    "PUDC" => get-ref(config-data-pins[to-int(CONFIG-PUDC)]),
-    ]))
-
-  ;External master clock
-  add(support-stmts(outline), support-stmt("virtex-7-external-master-clock", [
-    "EMCCLK" => get-ref(config-data-pins[to-int(CONFIG-EMCCLK)]),
-    ]))
-
-  ;Revision select
-  add(support-stmts(outline), support-stmt("virtex-7-revision-select", [
-    "RS[0]" => get-ref(rev-sel[0]),
-    "RS[1]" => get-ref(rev-sel[1]),
-    ]))
+      )
+  add-support-func("config-data-bus", config-data-bus-stmts)
 
   ;VREF supports
   val vref-pin-names = seq(get-ref, vref-pins)
-  add(support-stmts(outline), for-stmt("p", to-string("[%,]" % [vref-pin-names]), [
+  add-support-func("vref", [for-stmt("p", to-string("[%,]" % [vref-pin-names]), [
     support-stmt("virtex-7-vref", [
       "VREF" => "p"
-    ])]))
+    ])])])
 
   ;Clock supports
-  add(support-stmts(outline), for-stmt("bank-and-channel", to-string(qsort(srcc-pins, compare)), [
+  val srcc-stmt = for-stmt("bank-and-channel", to-string(qsort(srcc-pins, compare)), [
     "val [bank, channel] = bank-and-channel",
     support-stmt("virtex-7-single-region-clock", [
       "SRCC" => "comp.IO[bank].D[channel].P"])
     support-stmt("virtex-7-single-region-clock", [
       "SRCC" => "comp.IO[bank].D[channel].N"])
-    ]))
-  add(support-stmts(outline), for-stmt("bank-and-channel", to-string(qsort(mrcc-pins, compare)), [
+    ])
+  val mrcc-stmt = for-stmt("bank-and-channel", to-string(qsort(mrcc-pins, compare)), [
     "val [bank, channel] = bank-and-channel",
     support-stmt("virtex-7-multi-region-clock", [
       "MRCC" => "comp.IO[bank].D[channel].P"])
     support-stmt("virtex-7-multi-region-clock", [
       "MRCC" => "comp.IO[bank].D[channel].N"])
-    ]))
+    ])
+  add-support-func("clock", [srcc-stmt, mrcc-stmt])
 
-  add-all(support-stmts(outline), make-adc-supports(pins))
-  add-all(support-stmts(outline), make-dci-supports(pins))
-  add-all(support-stmts(outline), make-memory-strobe-supports(pins))
-  add-all(support-stmts(outline), make-memory-byte-group-supports(pins, bank-ids))
+  add-support-func("adc", make-adc-supports(pins))
+
+  add-support-func("dci", make-dci-supports(pins))
+
+  add-support-func("memory-strobe", make-memory-strobe-supports(pins))
+
+  add-support-func("memory-byte-group", make-memory-byte-group-supports(pins, bank-ids))
+
   false
 
 defn make-adc-supports (pins:Vector<IOXilinxPin>) -> Tuple<Expr> :
@@ -653,9 +606,9 @@ defn make-adc-supports (pins:Vector<IOXilinxPin>) -> Tuple<Expr> :
 
   [for-stmt("bank-and-channel", bank+channels, [
     "val [bank, channel] = bank-and-channel",
-    support-stmt("virtex-7-adc", [
-      "ADC.P" => "comp.IO[bank].D[channel].P",
-      "ADC.N" => "comp.IO[bank].D[channel].N"])
+    support-stmt("adc-pair", [
+      "adc-pair.P" => "comp.IO[bank].D[channel].P",
+      "adc-pair.N" => "comp.IO[bank].D[channel].N"])
     ])]
 
 ;Currently assumes the VRN pin is always channel 0 and the VRP pin is always 25
