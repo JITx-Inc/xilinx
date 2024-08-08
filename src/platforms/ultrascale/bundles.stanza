@@ -1,0 +1,40 @@
+#use-added-syntax(jitx)
+defpackage xilinx/platforms/ultrascale/bundles :
+  import core
+  import collections
+
+  import jitx
+  import jitx/commands
+
+  import jsl/bundles
+
+public pcb-bundle diff-gpio :
+  port diff-gpio : diff-pair
+
+public pcb-bundle ultrascale-hd-io-bank :
+  port L : diff-pair[[1 through 24]]
+
+public pcb-bundle ultrascale-hp-byte-group :
+  port L : diff-pair[6]
+  port S : pin
+
+public pcb-bundle ultrascale-hp-io-bank :
+  port T : ultrascale-hp-byte-group[4]
+
+public pcb-bundle ultrascale-gt-quad :
+  port C : lane-pair[4]
+
+public pcb-bundle ultrascale-gt-clock :
+  port I : diff-pair[2]
+
+public pcb-bundle ultrascale-pull-up-during-config :
+  port PUDC : pin
+
+public pcb-bundle ultrascale-revision-select :
+  port RS : pin[2]
+
+public pcb-bundle ultrascale-vref :
+  port VREF : pin
+
+public pcb-bundle ultrascale-dci-vref-p :
+  port VRP : pin

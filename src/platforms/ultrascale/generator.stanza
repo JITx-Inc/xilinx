@@ -1,0 +1,70 @@
+defpackage xilinx/platforms/ultrascale/generator :
+  import core
+  import collections
+  import maybe-utils
+
+  import xilinx/bundler
+  import xilinx/pinouts
+  import xilinx/pin-ir
+  import xilinx/pad-ref
+  import xilinx/generator-utilities
+  import xilinx/platforms/ultrascale/types
+  import xilinx/platforms/ultrascale/parser
+
+;============================================================
+;========================= Outline ==========================
+;============================================================
+
+;Holds all the statements in each section of the auto-generated component
+defstruct ComponentOutline :
+  comp-ports:Vector<Expr> with: (init => Vector<Expr>())
+  pin-props:Vector<Expr> with: (init => Vector<Expr>())
+  module-ports:Vector<Expr> with: (init => Vector<Expr>())
+  module-nets:Vector<Expr> with: (init => Vector<Expr>())
+  support-stmts:Vector<Expr> with: (init => Vector<Expr>())
+  support-funcs:Vector<Expr> with: (init => Vector<Expr>())
+
+;============================================================
+;======================== Generator =========================
+;============================================================
+
+val SIMPLE-TMPLT =
+\<s>#use-added-syntax(jitx)
+defpackage components/%_ :
+  import core
+  import collections
+
+  import jitx
+  import jitx/commands
+
+  import jsl/design/settings
+  import jsl/bundles
+  import jsl/bundles/debug
+  import jsl/symbols/box-symbol
+
+  import xilinx/platforms/ultrascale/bundles
+  import landpatterns/%_
+
+%_
+
+%_
+
+%_
+
+%_
+<s>
+
+;Generate the component and module definition from a pinout
+public defn generate-component (name:String, landpattern-name:String, pinout:XilinxPinout) -> String :
+  val dedicated-pins = Vector<DedicatedXilinxPin>()
+  val io-pins = Vector<IOXilinxPin>()
+  for pd in pins(pinout) do :
+    match(parse(pd)) :
+      (p:UltrascaleDedicatedPin) : add(dedicated-pins, p)
+      (p:UltrascaleIOPin) : add(io-pins, p)
+
+  ""
+
+;============================================================
+;========================= Helpers ==========================
+;============================================================
