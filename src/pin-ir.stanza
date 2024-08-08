@@ -43,6 +43,11 @@ public defenum Diff-Polarity:
   Diff-P
   Diff-N
 
+public defn to-letter (p:Diff-Polarity) -> String :
+  switch(p) :
+    Diff-P : "P"
+    Diff-N : "N"
+
 doc: \<DOC>
 Polarized Type
 
