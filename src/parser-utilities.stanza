@@ -1,0 +1,81 @@
+defpackage xilinx/parser-utilities :
+  import core
+  import collections
+  import maybe-utils
+
+  import xilinx/pin-ir
+
+;============================================================
+;================== Pin Parsing Utilities ===================
+;============================================================
+
+public defn letter-to-polarity (str:String) -> Diff-Polarity :
+  switch(str) :
+    "P" : Diff-P
+    "N" : Diff-N
+    else : throw(Exception("Invalid differential polarity: '%_'" % [str]))
+
+;Check if 'name' is of the format '{prefix}([0-9]+)', if so return the number
+public defn match-number-suffix (name:String, prefix:String) -> Maybe<Int> :
+  if prefix?(name, prefix) :
+    match(to-int(name[length(prefix) to false])) :
+      (i:Int) :
+        if i >= 0 : One(i)
+        else : None()
+      (_) : None()
+  else :
+    None()
+
+defenum MATCH-TYPE :
+  MATCH_STRICT
+  MATCH+1
+  MATCH+N
+
+defn find-prefix (pattern:String) -> [String,MATCH-TYPE] :
+  label<[String, MATCH-TYPE]> return:
+    val single? = index-of-char(pattern, '.')
+    match(single?):
+      (_:False): false
+      (x:Int):
+        return([pattern[0 to x], MATCH+1])
+
+    val multi? = index-of-char(pattern, '*')
+    match(multi?):
+      (_:False):
+        return([pattern, MATCH_STRICT])
+      (x:Int):
+        return([pattern[0 to x], MATCH+N])
+
+;Checks if the string 'str' matches the UNIX glob-style pattern 'pattern'
+;'pattern' is matched exactly except for these special characters:
+;- '*' = match 1 or more characters
+;- '.' = match exactly one character
+;The special character must be the last character in the pattern
+public defn glob-match? (str:String, pattern:String) -> True|False :
+  val [pat-prefix, pat-type] = find-prefix(pattern)
+
+  val index? = index-of-chars(str, pat-prefix)
+  match(index?):
+    (_:False): false
+    (x:Int):
+      switch(pat-type):
+        MATCH_STRICT:
+          length(str) == length(pat-prefix)
+        MATCH+1:
+          length(str) == (length(pat-prefix) + 1)
+        MATCH+N:
+          length(str) > length(pat-prefix)
+
+doc: \<DOC>
+Split the pin name on the bank identifier, if it is present
+Pins with an assigned bank will have a `_NNN` suffix where `NNN` is the bank
+number
+<DOC>
+public defn split-on-bank (name:String) -> [String,Maybe<Int>] :
+  match(last-index-of-char(name, '_')) :
+    (i:Int) :
+      val bank-str = name[(i + 1) to false]
+      match(to-int(bank-str)) :
+        (bank:Int) : [name[0 to i], One(bank)]
+        (_) : [name, None()]
+    (_) : [name, None()]

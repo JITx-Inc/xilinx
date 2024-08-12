@@ -21,6 +21,10 @@ public pcb-bundle ultrascale-hp-byte-group :
 public pcb-bundle ultrascale-hp-io-bank :
   port T : ultrascale-hp-byte-group[4]
 
+public pcb-bundle ultrascale-short-hp-io-bank :
+  port L : diff-pair[2]
+  port S : pin[2]
+
 public pcb-bundle ultrascale-gt-quad :
   port C : lane-pair[4]
 
@@ -29,9 +33,6 @@ public pcb-bundle ultrascale-gt-clock :
 
 public pcb-bundle ultrascale-pull-up-during-config :
   port PUDC : pin
-
-public pcb-bundle ultrascale-revision-select :
-  port RS : pin[2]
 
 public pcb-bundle ultrascale-vref :
   port VREF : pin

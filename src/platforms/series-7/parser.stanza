@@ -5,6 +5,7 @@ defpackage xilinx/platforms/series-7/parser :
 
   import xilinx/pinouts
   import xilinx/pin-ir
+  import xilinx/parser-utilities
   import xilinx/platforms/series-7/types
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -86,7 +87,8 @@ defn parse-serial-transceiver (name:String, bank:Maybe<Int>) -> SerialTransceive
 ; Map of String : (String,Maybe<Int>) -> DedicatedPinType
 ;  The string is the pin name that we will match against
 ;   with the bank ID (`_0` for bank 0) removed.
-;   The string can include the `*` glob pattern string for
+;   The string can include `*` to match 1 or more characters or `.` to match
+;   exactly 1 character (Must be at the end).
 ;   matching against a set of options.
 ;  The function is called with the pin name and optional bank index as arguments
 ;  The function returns either a `SpecialFunction` or `Tuple<SpecialFunction>`
@@ -126,67 +128,13 @@ val dedicated-map = [
   ["MGT*", parse-serial-transceiver]
 ]
 
-defenum MATCH-TYPE :
-  MATCH_STRICT
-  MATCH+1
-  MATCH+N
-
-defn find-prefix (pattern:String) -> [String, MATCH-TYPE] :
-  label<[String, MATCH-TYPE]> return:
-    val single? = index-of-char(pattern, '.')
-    match(single?):
-      (_:False): false
-      (x:Int):
-        return([pattern[0 to x], MATCH+1])
-
-    val multi? = index-of-char(pattern, '*')
-    match(multi?):
-      (_:False):
-        return([pattern, MATCH_STRICT])
-      (x:Int):
-        return([pattern[0 to x], MATCH+N])
-
-defn glob (v:String, pattern:String) -> True|False :
-  val [pat-prefix, pat-type] = find-prefix(pattern)
-
-  val index? = index-of-chars(v, pat-prefix)
-  match(index?):
-    (_:False): false
-    (x:Int):
-      switch(pat-type):
-        MATCH_STRICT:
-          length(v) == length(pat-prefix)
-        MATCH+1:
-          length(v) == (length(pat-prefix) + 1)
-        MATCH+N:
-          length(v) > length(pat-prefix)
-
 defn find-dedicated-transform (v:String) -> Maybe<[String, ((String,Maybe<Int>) -> SpecialFunction|Tuple<SpecialFunction>)]> :
   for pair in dedicated-map first:
     val [pattern, func] = pair
-    if glob(v, pattern):
+    if glob-match?(v, pattern):
       One $ pair
     else:
       None()
-
-doc: \<DOC>
-Split the IO pin name on the bank identifier
-
-Each IO pin has a `_NNN` suffix, for which `NNN` is
-the integer number denoting the bank of this pin.
-
-High Speed IO hav a `_G0` or `_G1` suffix.
-
-Power pins may not have any suffix, like `GND` or `VCCINT`
-<DOC>
-defn split-on-bank (name:String) -> [String,Maybe<Int>] :
-  match(last-index-of-char(name, '_')) :
-    (i:Int) :
-      val bank-str = name[(i + 1) to false]
-      match(to-int(bank-str)) :
-        (bank:Int) : [name[0 to i], One(bank)]
-        (_) : [name, None()]
-    (_) : [name, None()]
 
 defn extract-diff-pair (v:String) -> [Int, Maybe<Diff-Polarity>]:
   if length(v) == 0:

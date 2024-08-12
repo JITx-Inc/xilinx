@@ -108,6 +108,14 @@ with:
   printer => true
 
 doc: \<DOC>
+Processor System Multiplexed I/O Mode Selection Type
+<DOC>
+public defstruct PSMultiplexedIOModeType <: SpecialFunction :
+  index:Int
+with:
+  printer => true
+
+doc: \<DOC>
 Processor System Multiplexed I/O Type
 <DOC>
 public defstruct PSMultiplexedIOType <: SpecialFunction :
@@ -119,34 +127,125 @@ doc: \<DOC>
 Processor System I/O Supply Voltage Type
 <DOC>
 public defstruct PSIOPowerSupplyType <: SpecialFunction :
+  index:Int
   bank:Int
 with:
   printer => true
 
-public defenum PSDDREnum :
-  PSDDR-DQ
-  PSDDR-DQS-P
-  PSDDR-DQS-N
-  PSDDR-ALERT-N
-  PSDDR-ACT-N
-  PSDDR-A
-  PSDDR-BA
-  PSDDR-BG
-  PSDDR-CK-N
-  PSDDR-CK
-  PSDDR-CKE
-  PSDDR-CS
-  PSDDR-DM
-  PSDDR-ODT
-  PSDDR-PARITY
-  PSDDR-RAM-RST-N
-  PSDDR-ZQ
+doc: \<DOC>
+Processor System DDR Memory Data (DQ) Type
+<DOC>
+public defstruct PSDDRDataType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
 
 doc: \<DOC>
-Processor System DDR Type
+Processor System DDR Memory Strobe (DQS) Type
 <DOC>
-public defstruct PSDDRType <: SpecialFunction :
-  type:PSDDREnum
+public defstruct PSDDRStrobeType <: IndexableType & PolarizedType & SpecialFunction :
+  index:Int with: (as-method => true)
+  polarity:Diff-Polarity with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Alert Signal Type
+<DOC>
+public defstruct PSDDRAlertType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Activation Command Type
+<DOC>
+public defstruct PSDDRActivationType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Address (A) Type
+<DOC>
+public defstruct PSDDRAddrType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Bank Address (BA) Type
+<DOC>
+public defstruct PSDDRBankAddrType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Bank Group (BG) Type
+<DOC>
+public defstruct PSDDRBankGroupType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Clock (CK) Type
+<DOC>
+public defstruct PSDDRClockType <: IndexableType & PolarizedType & SpecialFunction :
+  index:Int with: (as-method => true)
+  polarity:Diff-Polarity with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Clock Enable (CKE) Type
+<DOC>
+public defstruct PSDDRClockEnableType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Chip Select (CS) Type
+<DOC>
+public defstruct PSDDRChipSelectType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Data Mask (DM) Type
+<DOC>
+public defstruct PSDDRDataMaskType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Termination Control (ODT) Type
+<DOC>
+public defstruct PSDDRTerminationControlType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Parity Signal Type
+<DOC>
+public defstruct PSDDRParityType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Reset Signal Type
+<DOC>
+public defstruct PSDDRResetType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR ZQ Calibration Type
+<DOC>
+public defstruct PSDDRZQType <: SpecialFunction
 with:
   printer => true
 
@@ -175,7 +274,7 @@ public deftype SerialTransceiverType <: SpecialFunction
 
 public defenum GigabitClass:
   GTR
-  GTX
+  GTY
   GTH
 
 public defenum GigabitDirection:
