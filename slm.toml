@@ -3,3 +3,4 @@ version = "0.1.0"
 [dependencies]
 maybe-utils = { git = "StanzaOrg/maybe-utils", version = "0.1.4" }
 jsl = { git = "JITx-Inc/jsl", version = "0.4.3" }
+slm-pcre = { git = "StanzaOrg/slm-pcre", version = "0.0.2" }
