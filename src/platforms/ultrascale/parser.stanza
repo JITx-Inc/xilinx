@@ -63,6 +63,7 @@ defn parse-ddr-clock (comps:Tuple<String>) -> PSDDRClockType :
   PSDDRClockType(index, polarity)
 
 defn parse-serial-quad (comps:Tuple<String>) -> TransceiverQuadType :
+  val ps? = comps[0] == "PS_"
   val class = switch(comps[1]) :
     "R" : GTR
     "Y" : GTY
@@ -72,12 +73,15 @@ defn parse-serial-quad (comps:Tuple<String>) -> TransceiverQuadType :
     "RX" : GTRX
   val polarity = letter-to-polarity(comps[3])
   val index = to-int!(comps[4])
-  TransceiverQuadType(class, index, dir, polarity)
+  val bank = to-int!(comps[5])
+  TransceiverQuadType(bank, class, index, dir, polarity, ps?)
 
 defn parse-serial-clock (comps:Tuple<String>) -> TransceiverClockType :
+  val ps? = comps[0] == "PS_"
   val index = to-int!(comps[1])
   val polarity = letter-to-polarity(comps[2])
-  TransceiverClockType(index, polarity)
+  val bank = to-int!(comps[3])
+  TransceiverClockType(bank, index, polarity, ps?)
 
 ;Dedicated pin name pattern to special function map
 val dedicated-map:Tuple<KeyValue<String,SpecialFunction|Tuple<SpecialFunction>|(Tuple<String> -> SpecialFunction)>> = [
@@ -90,10 +94,10 @@ val dedicated-map:Tuple<KeyValue<String,SpecialFunction|Tuple<SpecialFunction>|(
   "PS_ERROR_OUT" => ConfigType()
   "PS_ERROR_STATUS" => ConfigType()
   "PS_INIT_B" => ConfigType()
-  "PS_JTAG_TCK" => ConfigType()
-  "PS_JTAG_TDI" => ConfigType()
-  "PS_JTAG_TDO" => ConfigType()
-  "PS_JTAG_TMS" => ConfigType()
+  "PS_JTAG_TCK" => JTAGType(TCK)
+  "PS_JTAG_TDI" => JTAGType(TDI)
+  "PS_JTAG_TDO" => JTAGType(TDO)
+  "PS_JTAG_TMS" => JTAGType(TMS)
   "PS_MODE([0-3])" => parse-int(PSMultiplexedIOModeType)
   "PS_PADI" => ConfigType()
   "PS_PADO" => ConfigType()
@@ -159,8 +163,8 @@ val dedicated-map:Tuple<KeyValue<String,SpecialFunction|Tuple<SpecialFunction>|(
   ; Use (PS_|) instead of (PS_)? to guarantee match group creation
   "MGT(RREF|AVTTRCAL)(_[LR][NS]?)?" => TransceiverRefType()
   "PS_MGTRREF_(\\d+)" => TransceiverRefType()
-  "MGT(AVCC|AVTT|VCCAUX)_[LR][NS]?" => PowerRailType(None())
-  "PS_MGT(RAVCC|RAVTT)" => PowerRailType(None())
+  "MGT(AVCC|AVTT|VCCAUX)_[LR][NS]?" => PowerRailType()
+  "PS_MGT(RAVCC|RAVTT)" => PowerRailType()
   "(PS_|)MGTREFCLK([0-3])([NP])_(\\d+)" => parse-serial-clock
   "(PS_|)MGT([HPRY])(TX|RX)([NP])([0-3])_(\\d+)" => parse-serial-quad
 ]

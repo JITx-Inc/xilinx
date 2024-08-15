@@ -178,8 +178,13 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, pins:Vector<Dedica
     add(pin-props(outline), pin-props-stmt(name, pads, xilinx-bank, symbol-bank = symbol-bank))
 
   ;Add a port declaration
-  defn add-port-decl (name:Expr, type:Expr, indices:Tuple<Int>) -> False :
-    add(comp-ports(outline), port-decl-stmt(name, type, indices))
+  defn add-port-decl (name:Expr, type:Expr, indices:Tuple<Int>|False) -> False :
+    match(indices) :
+      (indices:Tuple<Int>) :
+        if length(indices) > 0 :
+          add(comp-ports(outline), port-decl-stmt(name, type, indices))
+      (_) :
+        add(comp-ports(outline), pin-decl-stmt(name, type))
 
   ;Add module pin declaration and net loop
   defn add-module-pin-and-net-loop (name:Expr) -> False :
@@ -276,14 +281,13 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, pins:Vector<Dedica
   ;Config mode pins
   add-port-decl("M", "pin", [0 1 2])
   ;JTAG
-  add-port-decl("JTAG", "jtag", [])
+  add-port-decl("JTAG", "jtag", false)
   ;Serial transceiver
   for (name in ["MGTREFCLK", "MGTRREF", "MGTAVTTRCAL", "MGTP", "MGTX", "MGTH"],
        type in ["virtex-7-gt-clock", "pin", "pin", "virtex-7-gt-quad", "virtex-7-gt-quad", "virtex-7-gt-quad"],
        banks in [gtclock-banks, gtrref-banks, gtavttrcal-banks, gtp-banks, gtx-banks, gth-banks]
       ) do :
-    if length(banks) > 0 :
-      add-port-decl(name, type, to-tuple(banks))
+    add-port-decl(name, type, to-tuple(banks))
   false
 
 ;Create IO pin properties rows, set IO pin final reference names, and add IO bank port declarations

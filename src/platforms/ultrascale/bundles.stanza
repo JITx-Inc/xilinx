@@ -31,6 +31,9 @@ public pcb-bundle ultrascale-gt-quad :
 public pcb-bundle ultrascale-gt-clock :
   port I : diff-pair[2]
 
+public pcb-bundle ultrascale-ps-gt-clock :
+  port I : diff-pair[4]
+
 public pcb-bundle ultrascale-pull-up-during-config :
   port PUDC : pin
 

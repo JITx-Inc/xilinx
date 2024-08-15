@@ -61,10 +61,10 @@ public defn pin-decl-stmt (name:Expr) -> Expr :
   "port %_ : pin" % [name]
 
 ;Create a port declaration
-public defn port-decl-stmt (name:Expr, type:Expr, indices:Tuple<Int>) -> Expr :
+public defn port-decl-stmt (name:Expr, type:Expr, indices:Tuple<Int> = []) -> Expr :
   val index-arr-str = ("[%_]" % [pretty-indices-str(indices)]) when
     (length(indices) > 0) else ""
-  "port %_: %_%_" % [name, type, index-arr-str]
+  "port %_ : %_%_" % [name, type, index-arr-str]
 
 ;Create a net statement for a multi-pin port
 public defn port-net-loop-stmt (name:Expr) -> Expr :
@@ -101,7 +101,7 @@ public defn group-by-bundle<?K,?V> (key-fn:(V -> ?K|False), xs:Seqable<?V>)
         false
   result
 
-public defn strip-bank (name:String) -> String :
+public defn strip-last-comp (name:String) -> String :
   name[0 to last-index-of-char(name, '_')]
 
 ;Group a set of indices into consecutive ranges where possible

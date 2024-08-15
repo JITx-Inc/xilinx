@@ -24,6 +24,34 @@ defstruct ComponentOutline :
   support-stmts:Vector<Expr> with: (init => Vector<Expr>())
   support-funcs:Vector<Expr> with: (init => Vector<Expr>())
 
+;Add a pin properties row
+defn add-pin-prop-row (outline:ComponentOutline, name:Expr, pads:PadRef,
+                       xilinx-bank:Int = 0 -- symbol-bank:Maybe<Expr> = None())
+                       -> False :
+  add(pin-props(outline), pin-props-stmt(name, [pads], xilinx-bank,
+    symbol-bank = symbol-bank))
+defn add-pin-prop-row (outline:ComponentOutline, name:Expr, pads:PadRef,
+                       xilinx-bank?:Maybe<Int> --
+                       symbol-bank:Maybe<Expr> = None()) -> False :
+  add-pin-prop-row(outline, name, pads, value-or(xilinx-bank?, 0),
+    symbol-bank = symbol-bank)
+
+;Add a port declaration
+defn add-port-decl (outline:ComponentOutline, name:Expr, type:Expr,
+                    indices:Tuple<Int>|False) -> False :
+  match(indices) :
+    (indices:Tuple<Int>) :
+      if length(indices) > 0 :
+        add(comp-ports(outline), port-decl-stmt(name, type, indices))
+    (_) :
+      add(comp-ports(outline), port-decl-stmt(name, type))
+
+;Add module pin declaration and net loop
+defn add-module-pin-and-net-loop (outline:ComponentOutline, name:Expr)
+                                  -> False :
+  add(module-ports(outline), pin-decl-stmt(name))
+  add(module-nets(outline), port-net-loop-stmt(name))
+
 ;============================================================
 ;======================== Generator =========================
 ;============================================================
@@ -56,15 +84,199 @@ defpackage components/%_ :
 
 ;Generate the component and module definition from a pinout
 public defn generate-component (name:String, landpattern-name:String, pinout:XilinxPinout) -> String :
-  val dedicated-pins = Vector<DedicatedXilinxPin>()
-  val io-pins = Vector<IOXilinxPin>()
+  val dedicated-pins = Vector<USDedicatedPin>()
+  val io-pins = Vector<USIOPin>()
   for pd in pins(pinout) do :
     match(parse(pd)) :
-      (p:UltrascaleDedicatedPin) : add(dedicated-pins, p)
-      (p:UltrascaleIOPin) : add(io-pins, p)
+      (p:USDedicatedPin) : add(dedicated-pins, p)
+      (p:USIOPin) : add(io-pins, p)
 
-  ""
+  val outline = ComponentOutline()
+  make-dedicated-pin-properties(outline, dedicated-pins)
+  val io-bank-ids = make-io-pin-properties(outline, io-pins)
+  make-supports(outline, io-pins, io-bank-ids)
+  fill-template-with-outline(outline, name, landpattern-name)
 
 ;============================================================
 ;========================= Helpers ==========================
 ;============================================================
+
+defn fill-template-with-outline (outline:ComponentOutline, name:String, landpattern-name:String) -> String :
+  val props-stmt = BodyExpr("pin-properties :",
+    ["[ pin:Ref | pads:Ref ... | bank:(Ref|Int) | xilinx-bank:Int | memory-byte-group:Int ]"],
+    seq(to-string, pin-props(outline)))
+  val symbol-stmts = [
+    "val box = BoxSymbol(self)",
+    BodyExpr("val unique-sym-banks = to-tuple $ unique $ for p in pins(self) seq :",
+      ["property(p.bank)"])
+    BodyExpr("property(self.bank-mappings) = to-tuple $ for (i in 0 to false, sym in unique-sym-banks) seq :",
+      ["sym => i"])
+    "assign-symbols(seq({_ => box}, unique-sym-banks))"
+    ]
+  val comp-stmt = BodyExpr("protected pcb-component component :",
+    seq(to-string, comp-ports(outline)),
+    [props-stmt],
+    symbol-stmts,
+    ["assign-landpattern(%_)" % [landpattern-name]]
+    )
+  val module-stmt = BodyExpr("protected pcb-module module :",
+    seq(to-string, module-ports(outline)),
+    ["",
+      "inst comp : component",
+      "val bank-mappings = property(comp.bank-mappings)"
+      for-stmt("bank-mapping", "bank-mappings", [
+        BodyExpr("schematic-group(comp, value(bank-mapping)) = (", [
+          BodyExpr("match(key(bank-mapping)) :", [
+            "(r:Ref) : r"
+            "(i:Int) : IndexRef(Ref(`bank), i))"
+            ])
+          ])
+        ])
+      ""],
+    seq(to-string, module-nets(outline)),
+    ["", "make-supports(comp)"]
+  )
+  val supports-stmt = BodyExpr("defn make-supports (comp:Instance) :",
+    to-tuple(seq(to-string, support-stmts(outline))))
+  val support-funcs = string-join(support-funcs(outline), "\n\n")
+
+  to-string $ SIMPLE-TMPLT % [name, landpattern-name, comp-stmt, module-stmt,
+    supports-stmt, support-funcs]
+
+defn make-dedicated-pin-properties (outline:ComponentOutline, dedicated-pins:Vector<USDedicatedPin>) -> False :
+  ;Group pins by pin name
+  val groups = to-vector<Vector<USDedicatedPin>> $ values $ group-by-bundle(/name, dedicated-pins)
+  ;Sort pins in each group by pad name
+  do(qsort!{pad, _}, groups)
+  ;Sort groups by size then pin name
+  ; qsort!({[(- length(_0)), name(_0[0])]}, groups)
+  qsort!{groups, _} $ fn (a, b) :
+    compare([(- length(a)), name(a[0])], [(- length(b)), name(b[0])])
+
+  val dqs-indices = IntSet()
+  val ddr-clock-indices = IntSet()
+  val gt-clock-indices = IntSet()
+  val ps-gt-clock-indices = IntSet()
+  val gth-banks = IntSet()
+  val gty-banks = IntSet()
+  val gtr-banks = IntSet()
+
+  for group in groups do :
+    val p = group[0]
+    match(funcs(p)[0]) :
+      (f:JTAGType) :
+        val name* = switch(signal(f)) :
+          TCK : "PS_JTAG.tck"
+          TMS : "PS_JTAG.tms"
+          TDI : "PS_JTAG.tdi"
+          TDO : "PS_JTAG.tdo"
+        add-pin-prop-row(outline, "JTAG.tck", pad(p))
+
+      (f:PowerRailType) :
+        val [name*, bank] = match(bank(f)) :
+          (bank:One<Int>) :
+            val name* = to-string $ "%_[%_]" % [strip-last-comp(name(p)), value(bank)]
+            [name*, value(bank)]
+          (_) :
+            [name(p), 0]
+        add-pin-prop-row(outline, name*, pad(p), bank)
+
+      (f:PSIOPowerSupplyType) :
+        val name* = to-string $ "VCCO_PSIO%_[%_]" % [index(f), bank(f)]
+        add-pin-prop-row(outline, name*, pad(p), bank(f))
+
+      (f:PSDDRDataType) :
+        val name* = "PS_DDR_DQ[%_]" % [index(f)]
+        add-pin-prop-row(outline, name*, pad(p), bank(p))
+
+      (f:PSDDRStrobeType) :
+        add(dqs-indices, index(f))
+        val name* = to-string $ "PS_DDR_DQS[%_].%_" % [index(f), to-letter(polarity(f))]
+        add-pin-prop-row(outline, name*, pad(p), bank(p))
+
+      (f:PSDDRAddrType) :
+        val name* = "PS_DDR_A[%_]" % [index(f)]
+        add-pin-prop-row(outline, name*, pad(p), bank(p))
+
+      (f:PSDDRBankAddrType) :
+        val name* = "PS_DDR_BA[%_]" % [index(f)]
+        add-pin-prop-row(outline, name*, pad(p), bank(p))
+
+      (f:PSDDRBankGroupType) :
+        val name* = "PS_DDR_BG[%_]" % [index(f)]
+        add-pin-prop-row(outline, name*, pad(p), bank(p))
+
+      (f:PSDDRClockType) :
+        add(ddr-clock-indices, index(f))
+        val name* = to-string $ "PS_DDR_CK[%_].%_" % [index(f), to-letter(polarity(f))]
+        add-pin-prop-row(outline, name*, pad(p), bank(p))
+
+      (f:PSDDRChipSelectType) :
+        val name* = "PS_DDR_CS_N[%_]" % [index(f)]
+        add-pin-prop-row(outline, name*, pad(p), bank(p))
+
+      (f:PSDDRDataMaskType) :
+        val name* = "PS_DDR_DM[%_]" % [index(f)]
+        add-pin-prop-row(outline, name*, pad(p), bank(p))
+
+      (f:PSDDRTerminationControlType) :
+        val name* = "PS_DDR_ODT[%_]" % [index(f)]
+        add-pin-prop-row(outline, name*, pad(p), bank(p))
+
+      (f:PSMultiplexedIOType) :
+        val name* = "PS_MIO[%_]" % [index(f)]
+        add-pin-prop-row(outline, name*, pad(p), bank(p))
+
+      (f:TransceiverClockType) :
+        val ps-str =
+          if processor-system?(f) :
+            add(ps-gt-clock-indices, bank(f))
+            "PS_"
+          else :
+            add(gt-clock-indices, bank(f))
+            ""
+        val pol-str = to-letter(polarity(f))
+        val name* = to-string $ "%_MGTREFCLK[%_].I[%_].%_" % [ps-str, bank(f),
+          index(f), pol-str]
+        add-pin-prop-row(outline, name*, pad(p), bank(f))
+
+      (f:TransceiverQuadType) :
+        val ps-str = "PS_" when processor-system?(f) else ""
+        switch(class(f)) :
+          GTR : add(gtr-banks, bank(f))
+          GTY : add(gty-banks, bank(f))
+          GTH : add(gth-banks, bank(f))
+        val class-str = to-string(class(f))
+        val dir-str = to-str(direction(f))
+        val pol-str = to-letter(polarity(f))
+        val name* = to-string $ "%_M%_[%_].C[%_].%_.%_" % [ps-str, class-str,
+          bank(f), index(f), dir-str, pol-str]
+        add-pin-prop-row(outline, name*, pad(p), bank(f))
+
+      (f) :
+        ;Default pin property row(s)
+        if length(group) > 1 :
+          ;Multi-pad pin
+          val grp-name = strip-last-comp(name(p))
+          for (i in 0 to false, p* in group) do :
+            val name* = "%_[%_]" % [grp-name, i]
+            add-pin-prop-row(outline, name*, pad(p*), bank(p*), symbol-bank = One(grp-name))
+          if grp-name != "NC" : ; do not net no-connect pins together
+            add-module-pin-and-net-loop(outline, grp-name)
+        else :
+          add-pin-prop-row(outline, name(p), pad(p), bank(p))
+
+  add-port-decl(outline, "PS_JTAG", "jtag", false)
+  add-port-decl(outline, "PS_DDR_DQS", "diff-pair", to-tuple(dqs-indices))
+  add-port-decl(outline, "PS_DDR_CK", "diff-pair", to-tuple(ddr-clock-indices))
+  add-port-decl(outline, "MGTREFCLK", "ultrascale-gt-clock", to-tuple(gt-clock-indices))
+  add-port-decl(outline, "PS_MGTREFCLK", "ultrascale-ps-gt-clock", to-tuple(ps-gt-clock-indices))
+  add-port-decl(outline, "MGTH", "ultrascale-gt-quad", to-tuple(gth-banks))
+  add-port-decl(outline, "MGTY", "ultrascale-gt-quad", to-tuple(gty-banks))
+  add-port-decl(outline, "PS_MGTR", "ultrascale-gt-quad", to-tuple(gtr-banks))
+
+defn make-io-pin-properties (outline:ComponentOutline, io-pins:Vector<USIOPin>) -> Tuple<Int> :
+  []
+
+defn make-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>, io-bank-ids:Tuple<Int>) -> False :
+  false

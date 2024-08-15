@@ -289,17 +289,26 @@ public defenum GigabitDirection:
   GTTX
   GTRX
 
+public defn to-str (e:GigabitDirection) -> String :
+  switch(e) :
+    GTTX : "TX"
+    GTRX : "RX"
+
 public defstruct TransceiverQuadType <: SerialTransceiverType & PolarizedType & IndexableType :
+  bank:Int
   class:GigabitClass
   index:Int with: (as-method => true)
   direction:GigabitDirection
   polarity:Diff-Polarity with: (as-method => true)
+  processor-system?:True|False
 with:
   printer => true
 
 public defstruct TransceiverClockType <: SerialTransceiverType & PolarizedType & IndexableType :
+  bank:Int
   index:Int with: (as-method => true)
   polarity:Diff-Polarity with: (as-method => true)
+  processor-system?:True|False
 with:
   printer => true
 
