@@ -53,6 +53,15 @@ defn add-module-pin-and-net-loop (outline:ComponentOutline, name:Expr)
   add(module-nets(outline), port-net-loop-stmt(name))
 
 ;============================================================
+;===================== Pin Organization =====================
+;============================================================
+
+defstruct IOBankIDs :
+  high-density-banks:Tuple<Int>
+  high-perf-banks:Tuple<Int>
+  short-high-perf-banks:Tuple<Int>
+
+;============================================================
 ;======================== Generator =========================
 ;============================================================
 
@@ -70,7 +79,7 @@ defpackage components/%_ :
   import jsl/bundles/debug
   import jsl/symbols/box-symbol
 
-  import xilinx/platforms/ultrascale/bundles
+  import bundles/ultrascale
   import landpatterns/%_
 
 %_
@@ -143,6 +152,8 @@ defn fill-template-with-outline (outline:ComponentOutline, name:String, landpatt
   to-string $ SIMPLE-TMPLT % [name, landpattern-name, comp-stmt, module-stmt,
     supports-stmt, support-funcs]
 
+;Create pin property rows, port declarations, and net statmenets from the
+;dedicated pins
 defn make-dedicated-pin-properties (outline:ComponentOutline, dedicated-pins:Vector<USDedicatedPin>) -> False :
   ;Group pins by pin name
   val groups = to-vector<Vector<USDedicatedPin>> $ values $ group-by-bundle(/name, dedicated-pins)
@@ -170,7 +181,7 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, dedicated-pins:Vec
           TMS : "PS_JTAG.tms"
           TDI : "PS_JTAG.tdi"
           TDO : "PS_JTAG.tdo"
-        add-pin-prop-row(outline, "JTAG.tck", pad(p))
+        add-pin-prop-row(outline, name*, pad(p))
 
       (f:PowerRailType) :
         val [name*, bank] = match(bank(f)) :
@@ -182,7 +193,7 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, dedicated-pins:Vec
         add-pin-prop-row(outline, name*, pad(p), bank)
 
       (f:PSIOPowerSupplyType) :
-        val name* = to-string $ "VCCO_PSIO%_[%_]" % [index(f), bank(f)]
+        val name* = to-string $ "VCCO_PSIO[%_]" % [index(f)]
         add-pin-prop-row(outline, name*, pad(p), bank(f))
 
       (f:PSDDRDataType) :
@@ -275,8 +286,51 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, dedicated-pins:Vec
   add-port-decl(outline, "MGTY", "ultrascale-gt-quad", to-tuple(gty-banks))
   add-port-decl(outline, "PS_MGTR", "ultrascale-gt-quad", to-tuple(gtr-banks))
 
-defn make-io-pin-properties (outline:ComponentOutline, io-pins:Vector<USIOPin>) -> Tuple<Int> :
-  []
+;Create IO pin properties rows and add IO bank port declarations
+;Returns the IO bank IDs
+defn make-io-pin-properties (outline:ComponentOutline, io-pins:Vector<USIOPin>) -> IOBankIDs :
+  val bank-group-table = IntTable<Vector<USIOPin>>()
+  for p in io-pins do :
+    val bid = bank(p)
+    val group = set?(bank-group-table, bid, {Vector<USIOPin>()})
+    add(group, p)
+  val bank-groups = qsort(key, bank-group-table)
 
-defn make-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>, io-bank-ids:Tuple<Int>) -> False :
+  val hd-banks = Vector<Int>()
+  val hp-banks = Vector<Int>()
+  val short-hp-banks = Vector<Int>()
+  for kv in bank-groups do :
+    val bid = key(kv)
+    val group = value(kv)
+    val port-name = match(group[0]) :
+      (p:USHDIOPin) :
+        add(hd-banks, bid)
+        "IO_HD"
+      (p:USHPDiffIOPin|USHPSingleIOPin) :
+        switch(length(group)) :
+          6 :
+            add(short-hp-banks, bid)
+            "IO_HP_S"
+          52 :
+            add(hp-banks, bid)
+            "IO_HP"
+          else :
+            throw(Exception("Unexpected high performance bank size of %_ pins \
+              on bank %_" % [length(group), bid]))
+    for p in group do :
+      val full-ref = append(port-name, ref-name(p))
+      add-pin-prop-row(outline, full-ref, pad(p), bid)
+  val ibi = IOBankIDs(to-tuple(hd-banks), to-tuple(hp-banks),
+    to-tuple(short-hp-banks))
+
+  add(comp-ports(outline), port-decl-stmt("IO_HD", "ultrascale-hd-io-bank",
+    high-density-banks(ibi)))
+  add(comp-ports(outline), port-decl-stmt("IO_HP", "ultrascale-hp-io-bank",
+    high-perf-banks(ibi)))
+  add(comp-ports(outline), port-decl-stmt("IO_HP_S", "ultrascale-short-hp-io-bank",
+    short-high-perf-banks(ibi)))
+
+  ibi
+
+defn make-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>, io-bank-ids:IOBankIDs) -> False :
   false

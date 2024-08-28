@@ -24,12 +24,13 @@ with:
   printer => true
 
 public deftype USIOPin <: UltrascalePin
+public defmulti bank (p:USIOPin) -> Int
 
 ;Ultrascale High-Density I/O Pin
 public defstruct USHDIOPin <: USIOPin :
   name:String with: (as-method => true)
   pad:PadRef with: (as-method => true)
-  bank:Int
+  bank:Int with: (as-method => true)
   index:Int
   diff-polarity:Diff-Polarity
   funcs:Tuple<SpecialFunction> with: (as-method => true)
@@ -37,14 +38,14 @@ with:
   printer => true
 
 defmethod ref-name (p:USHDIOPin) -> String :
-  to-string $ "IO_HD[%_].L[%_].%_" % [bank(p), index(p),
+  to-string $ "[%_].L[%_].%_" % [bank(p), index(p),
     to-letter(diff-polarity(p))]
 
 ;Ultrascale High-Performance Differential I/O Pin
 public defstruct USHPDiffIOPin <: USIOPin :
   name:String with: (as-method => true)
   pad:PadRef with: (as-method => true)
-  bank:Int
+  bank:Int with: (as-method => true)
   index:Int
   diff-polarity:Diff-Polarity
   byte-group:Int ; 0 to 3
@@ -54,14 +55,14 @@ with:
   printer => true
 
 defmethod ref-name (p:USHPDiffIOPin) -> String :
-  to-string $ "IO_HP[%_].T[%_].L[%_].%_" % [bank(p), byte-group(p), index(p),
-    to-letter(diff-polarity(p))]
+  to-string $ "[%_].T[%_].L[%_].%_" % [bank(p), byte-group(p),
+    ((index(p) - 1) % 6), to-letter(diff-polarity(p))]
 
 ;Ultrascale High-Performance Single-Ended I/O Pin
 public defstruct USHPSingleIOPin <: USIOPin :
   name:String with: (as-method => true)
   pad:PadRef with: (as-method => true)
-  bank:Int
+  bank:Int with: (as-method => true)
   byte-group:Int ; 0 to 3
   byte-nibble:NibbleLocation
   funcs:Tuple<SpecialFunction> with: (as-method => true)
@@ -69,7 +70,7 @@ with:
   printer => true
 
 defmethod ref-name (p:USHPSingleIOPin) -> String :
-  to-string $ "IO_HP[%_].T[%_].S" % [bank(p), byte-group(p)]
+  to-string $ "[%_].T[%_].S" % [bank(p), byte-group(p)]
 
 public defenum NibbleLocation :
   UpperNibble

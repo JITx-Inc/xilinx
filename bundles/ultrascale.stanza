@@ -1,5 +1,5 @@
 #use-added-syntax(jitx)
-defpackage xilinx/platforms/ultrascale/bundles :
+defpackage bundles/ultrascale :
   import core
   import collections
 
@@ -12,7 +12,7 @@ public pcb-bundle diff-gpio :
   port diff-gpio : diff-pair
 
 public pcb-bundle ultrascale-hd-io-bank :
-  port L : diff-pair[[1 through 24]]
+  port L : diff-pair[[1 through 12]]
 
 public pcb-bundle ultrascale-hp-byte-group :
   port L : diff-pair[6]
