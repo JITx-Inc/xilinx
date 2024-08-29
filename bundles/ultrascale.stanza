@@ -34,11 +34,27 @@ public pcb-bundle ultrascale-gt-clock :
 public pcb-bundle ultrascale-ps-gt-clock :
   port I : diff-pair[4]
 
-public pcb-bundle ultrascale-pull-up-during-config :
-  port PUDC : pin
+public pcb-bundle ultrascale-global-clock :
+  port N : pin
+  port P : pin
 
-public pcb-bundle ultrascale-vref :
-  port VREF : pin
+public pcb-bundle ultrascale-high-density-global-clock :
+  port N : pin
+  port P : pin
 
-public pcb-bundle ultrascale-dci-vref-p :
-  port VRP : pin
+public pcb-bundle ultrascale-dci-vref :
+  port p : pin
+
+public pcb-bundle ultrascale-dedicated-byte-clock :
+  port N : pin
+  port P : pin
+
+public pcb-bundle ultrascale-quad-byte-clock :
+  port N : pin
+  port P : pin
+
+public pcb-bundle ultrascale-pci-reset :
+  port p : pin
+
+public pcb-bundle ultrascale-pmbus-alert :
+  port p : pin

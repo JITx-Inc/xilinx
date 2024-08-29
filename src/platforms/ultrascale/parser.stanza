@@ -222,7 +222,7 @@ defn parse-io-funcs (multi-func-substr:String, full-name:String) -> Tuple<Specia
       val patt = key(kv)
       val func = value(kv)
       val reg-res = re-match(patt, comp)
-      if end(reg-res) >= 0 :
+      if end(reg-res) >= 0 and (result(reg-res)[0] == comp) :
         match(func) :
           (func:SpecialFunction) :
             add(funcs, func)

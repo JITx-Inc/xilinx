@@ -14,12 +14,18 @@ public defmulti ref-name (p:UltrascalePin) -> String
 defmethod ref-name (p:UltrascalePin) -> String : name(p)
 public defmulti pad (p:UltrascalePin) -> PadRef
 public defmulti funcs (p:UltrascalePin) -> Tuple<SpecialFunction>
+public defmulti final-ref (p:UltrascalePin) -> String
+public defmulti set-final-ref (p:UltrascalePin, s:String) -> False
 
 public defstruct USDedicatedPin <: UltrascalePin :
   name:String with: (as-method => true)
   pad:PadRef with: (as-method => true)
   bank:Maybe<Int>
   funcs:Tuple<SpecialFunction> with: (as-method => true)
+  final-ref:String with:
+    as-method => true
+    default => ""
+    setter => set-final-ref
 with:
   printer => true
 
@@ -34,6 +40,10 @@ public defstruct USHDIOPin <: USIOPin :
   index:Int
   diff-polarity:Diff-Polarity
   funcs:Tuple<SpecialFunction> with: (as-method => true)
+  final-ref:String with:
+    as-method => true
+    default => ""
+    setter => set-final-ref
 with:
   printer => true
 
@@ -51,6 +61,13 @@ public defstruct USHPDiffIOPin <: USIOPin :
   byte-group:Int ; 0 to 3
   byte-nibble:NibbleLocation
   funcs:Tuple<SpecialFunction> with: (as-method => true)
+  final-ref:String with:
+    as-method => true
+    default => ""
+    setter => set-final-ref
+  in-short-bank?:True|False with:
+    default => false
+    setter => set-in-short-bank?
 with:
   printer => true
 
@@ -66,6 +83,13 @@ public defstruct USHPSingleIOPin <: USIOPin :
   byte-group:Int ; 0 to 3
   byte-nibble:NibbleLocation
   funcs:Tuple<SpecialFunction> with: (as-method => true)
+  final-ref:String with:
+    as-method => true
+    default => ""
+    setter => set-final-ref
+  in-short-bank?:True|False with:
+    default => false
+    setter => set-in-short-bank?
 with:
   printer => true
 

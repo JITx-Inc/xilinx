@@ -181,6 +181,7 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, dedicated-pins:Vec
           TMS : "PS_JTAG.tms"
           TDI : "PS_JTAG.tdi"
           TDO : "PS_JTAG.tdo"
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p))
 
       (f:PowerRailType) :
@@ -190,52 +191,64 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, dedicated-pins:Vec
             [name*, value(bank)]
           (_) :
             [name(p), 0]
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank)
 
       (f:PSIOPowerSupplyType) :
         val name* = to-string $ "VCCO_PSIO[%_]" % [index(f)]
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(f))
 
       (f:PSDDRDataType) :
         val name* = "PS_DDR_DQ[%_]" % [index(f)]
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRStrobeType) :
         add(dqs-indices, index(f))
         val name* = to-string $ "PS_DDR_DQS[%_].%_" % [index(f), to-letter(polarity(f))]
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRAddrType) :
         val name* = "PS_DDR_A[%_]" % [index(f)]
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRBankAddrType) :
         val name* = "PS_DDR_BA[%_]" % [index(f)]
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRBankGroupType) :
         val name* = "PS_DDR_BG[%_]" % [index(f)]
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRClockType) :
         add(ddr-clock-indices, index(f))
         val name* = to-string $ "PS_DDR_CK[%_].%_" % [index(f), to-letter(polarity(f))]
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRChipSelectType) :
         val name* = "PS_DDR_CS_N[%_]" % [index(f)]
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRDataMaskType) :
         val name* = "PS_DDR_DM[%_]" % [index(f)]
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRTerminationControlType) :
         val name* = "PS_DDR_ODT[%_]" % [index(f)]
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSMultiplexedIOType) :
         val name* = "PS_MIO[%_]" % [index(f)]
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:TransceiverClockType) :
@@ -249,6 +262,7 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, dedicated-pins:Vec
         val pol-str = to-letter(polarity(f))
         val name* = to-string $ "%_MGTREFCLK[%_].I[%_].%_" % [ps-str, bank(f),
           index(f), pol-str]
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(f))
 
       (f:TransceiverQuadType) :
@@ -262,6 +276,7 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, dedicated-pins:Vec
         val pol-str = to-letter(polarity(f))
         val name* = to-string $ "%_M%_[%_].C[%_].%_.%_" % [ps-str, class-str,
           bank(f), index(f), dir-str, pol-str]
+        set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(f))
 
       (f) :
@@ -271,10 +286,12 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, dedicated-pins:Vec
           val grp-name = strip-last-comp(name(p))
           for (i in 0 to false, p* in group) do :
             val name* = "%_[%_]" % [grp-name, i]
+            set-final-ref(p*, name*)
             add-pin-prop-row(outline, name*, pad(p*), bank(p*), symbol-bank = One(grp-name))
           if grp-name != "NC" : ; do not net no-connect pins together
             add-module-pin-and-net-loop(outline, grp-name)
         else :
+          set-final-ref(p, name(p))
           add-pin-prop-row(outline, name(p), pad(p), bank(p))
 
   add-port-decl(outline, "PS_JTAG", "jtag", false)
@@ -310,6 +327,7 @@ defn make-io-pin-properties (outline:ComponentOutline, io-pins:Vector<USIOPin>) 
         switch(length(group)) :
           6 :
             add(short-hp-banks, bid)
+            do(set-in-short-bank?{_ as USHPDiffIOPin|USHPSingleIOPin, true}, group)
             "IO_HP_S"
           52 :
             add(hp-banks, bid)
@@ -319,6 +337,7 @@ defn make-io-pin-properties (outline:ComponentOutline, io-pins:Vector<USIOPin>) 
               on bank %_" % [length(group), bid]))
     for p in group do :
       val full-ref = append(port-name, ref-name(p))
+      set-final-ref(p, full-ref)
       add-pin-prop-row(outline, full-ref, pad(p), bid)
   val ibi = IOBankIDs(to-tuple(hd-banks), to-tuple(hp-banks),
     to-tuple(short-hp-banks))
@@ -333,4 +352,341 @@ defn make-io-pin-properties (outline:ComponentOutline, io-pins:Vector<USIOPin>) 
   ibi
 
 defn make-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>, io-bank-ids:IOBankIDs) -> False :
-  false
+  defn get-ref (p:USIOPin) -> String :
+    append("comp.", final-ref(p))
+
+  make-clock-supports(outline, io-pins)
+  make-dci-vref-supports(outline, io-pins)
+  make-byte-clock-supports(outline, io-pins)
+  make-pci-reset-supports(outline, io-pins)
+  make-adc-supports(outline, io-pins)
+  make-i2c-supports(outline, io-pins)
+  make-pmbus-supports(outline, io-pins)
+
+defn make-clock-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>) -> False :
+  val stmts = Vector<Expr>()
+
+  val hdgc-banks = IntSet()
+  val gc-banks = IntSet()
+  val short-gc-banks = IntSet()
+
+  for p in io-pins do :
+    if any?({_ is HighDensityGlobalClockType}, funcs(p)) :
+      if p is-not USHDIOPin :
+        throw(Exception("High-density-global-clock-supporting pin %_ is not a high-density pin" % [p]))
+      if index(p as USHDIOPin) < 5 or index(p as USHDIOPin) > 8 :
+        throw(Exception("High-density-global-clock-supporting pin %_ has unexpected index %_" % [p, index(p as USHDIOPin)]))
+      add(hdgc-banks, bank(p))
+    if any?({_ is GlobalClockType}, funcs(p)) :
+      match(p) :
+        (p:USHPDiffIOPin) :
+          if in-short-bank?(p) :
+            if index(p) < 11 or index(p) > 12 :
+              throw(Exception("Global-clock-supporting pin %_ in short group has unexpected index %_" % [p, index(p)]))
+            add(short-gc-banks, bank(p))
+          else :
+            if index(p) < 11 or index(p) > 14 :
+              throw(Exception("Global-clock-supporting pin %_ has unexpected index %_" % [p, index(p)]))
+            add(gc-banks, bank(p))
+        (p:USHDIOPin) :
+          throw(Exception("Global-clock-supporting pin %_ is not a high-performance pin" % [p]))
+        (p:USHPSingleIOPin) :
+          throw(Exception("Global-clock-supporting pin %_ is not a differential pin" % [p]))
+
+  if length(hdgc-banks) > 1 :
+    val bank-ids-str = compactify-for-loop-indices(hdgc-banks)
+    add(stmts, for-stmt("bank", bank-ids-str, [
+      for-stmt("i", "5 through 8", [
+        support-stmt("ultrascale-high-density-global-clock", [
+          "N" => "comp.IO_HD[bank].L[i].N",
+          "P" => "comp.IO_HD[bank].L[i].P"
+      ])])]))
+  else if length(hdgc-banks) == 1 :
+    val bank-id = to-tuple(hdgc-banks)[0]
+    add(stmts, for-stmt("i", "5 through 8", [
+      support-stmt("ultrascale-high-density-global-clock", [
+        "N" => to-string("comp.IO_HD[%_].L[i].N" % [bank-id]),
+        "P" => to-string("comp.IO_HD[%_].L[i].P" % [bank-id])
+      ])]))
+
+  if length(gc-banks) > 1 :
+    val bank-ids-str = compactify-for-loop-indices(gc-banks)
+    add(stmts, for-stmt("bank", bank-ids-str, [
+      support-stmt("ultrascale-global-clock", [
+        "N" => "comp.IO_HP[bank].T[1].L[4].N",
+        "P" => "comp.IO_HP[bank].T[1].L[4].P"]),
+      support-stmt("ultrascale-global-clock", [
+        "N" => "comp.IO_HP[bank].T[1].L[5].N",
+        "P" => "comp.IO_HP[bank].T[1].L[5].P"]),
+      support-stmt("ultrascale-global-clock", [
+        "N" => "comp.IO_HP[bank].T[2].L[0].N",
+        "P" => "comp.IO_HP[bank].T[2].L[0].P"]),
+      support-stmt("ultrascale-global-clock", [
+        "N" => "comp.IO_HP[bank].T[2].L[1].N",
+        "P" => "comp.IO_HP[bank].T[2].L[1].P"])
+      ]))
+  else if length(gc-banks) == 1 :
+    val bank-id = to-tuple(gc-banks)[0]
+    add-all(stmts, [
+      support-stmt("ultrascale-global-clock", [
+        "N" => to-string("comp.IO_HP[%_].T[1].L[4].N" % [bank-id]),
+        "P" => to-string("comp.IO_HP[%_].T[1].L[4].P" % [bank-id])]),
+      support-stmt("ultrascale-global-clock", [
+        "N" => to-string("comp.IO_HP[%_].T[1].L[5].N" % [bank-id]),
+        "P" => to-string("comp.IO_HP[%_].T[1].L[5].P" % [bank-id])]),
+      support-stmt("ultrascale-global-clock", [
+        "N" => to-string("comp.IO_HP[%_].T[2].L[0].N" % [bank-id]),
+        "P" => to-string("comp.IO_HP[%_].T[2].L[0].P" % [bank-id])]),
+      support-stmt("ultrascale-global-clock", [
+        "N" => to-string("comp.IO_HP[%_].T[2].L[1].N" % [bank-id]),
+        "P" => to-string("comp.IO_HP[%_].T[2].L[1].P" % [bank-id])])
+      ])
+
+  if length(short-gc-banks) > 1 :
+    val bank-ids-str = compactify-for-loop-indices(short-gc-banks)
+    add(stmts, for-stmt("bank", bank-ids-str, [
+      support-stmt("ultrascale-global-clock", [
+        "N" => "comp.IO_HP_S[bank].T[1].L[4].N",
+        "P" => "comp.IO_HP_S[bank].T[1].L[4].P"]),
+      support-stmt("ultrascale-global-clock", [
+        "N" => "comp.IO_HP_S[bank].T[1].L[5].N",
+        "P" => "comp.IO_HP_S[bank].T[1].L[5].P"])
+      ]))
+  else if length(short-gc-banks) == 1 :
+    val bank-id = to-tuple(short-gc-banks)[0]
+    add-all(stmts, [
+      support-stmt("ultrascale-global-clock", [
+        "N" => to-string("comp.IO_HP_S[%_].T[1].L[4].N" % [bank-id]),
+        "P" => to-string("comp.IO_HP_S[%_].T[1].L[4].P" % [bank-id])]),
+      support-stmt("ultrascale-global-clock", [
+        "N" => to-string("comp.IO_HP_S[%_].T[1].L[5].N" % [bank-id]),
+        "P" => to-string("comp.IO_HP_S[%_].T[1].L[5].P" % [bank-id])])
+      ])
+
+  add-support-func(outline, "clock", stmts)
+
+defn make-dci-vref-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>) -> False :
+  val stmts = Vector<Expr>()
+  for p in filter({any?({_ is DCIRefType}, funcs(_))}, io-pins) do :
+    add(stmts, support-stmt("ultrascale-dci-vref", [
+      "p" => to-string("comp.%_" % [final-ref(p)])
+      ]))
+  add-support-func(outline, "dci-vref", stmts)
+
+defn make-byte-clock-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>) -> False :
+  val stmts = Vector<Expr>()
+
+  val dbc-banks = IntSet()
+  val qbc-banks = IntSet()
+
+  for p in io-pins do :
+    if any?({_ is DedicatedByteClockType}, funcs(p)) :
+      match(p) :
+        (p:USHPDiffIOPin) :
+          if in-short-bank?(p) :
+            throw(Exception("Dedicated-byte-clock-supporting pin %_ is in a short bank" % [p]))
+          if not contains?([1 4 19 22], index(p)) :
+            throw(Exception("Dedicated-byte-clock-supporting pin %_ has unexpected index %_" % [p, index(p)]))
+          add(dbc-banks, bank(p))
+        (p:USHDIOPin) :
+          throw(Exception("Dedicated-byte-clock-supporting pin %_ is not a high-performance pin" % [p]))
+        (p:USHPSingleIOPin) :
+          throw(Exception("Dedicated-byte-clock-supporting pin %_ is not a differential pin" % [p]))
+    if any?({_ is QuadByteClockType}, funcs(p)) :
+      match(p) :
+        (p:USHPDiffIOPin) :
+          if in-short-bank?(p) :
+            throw(Exception("Quad-byte-clock-supporting pin %_ is in a short bank" % [p]))
+          if not contains?([7 10 13 16], index(p)) :
+            throw(Exception("Quad-byte-clock-supporting pin %_ has unexpected index %_" % [p, index(p)]))
+          add(qbc-banks, bank(p))
+        (p:USHDIOPin) :
+          throw(Exception("Quad-byte-clock-supporting pin %_ is not a high-performance pin" % [p]))
+        (p:USHPSingleIOPin) :
+          throw(Exception("Quad-byte-clock-supporting pin %_ is not a differential pin" % [p]))
+
+  if length(dbc-banks) > 1 :
+    val bank-ids-str = compactify-for-loop-indices(dbc-banks)
+    add(stmts, for-stmt("bank", bank-ids-str, [
+      support-stmt("ultrascale-dedicated-byte-clock", [
+        "N" => "comp.IO_HP[bank].T[0].L[0].N",
+        "P" => "comp.IO_HP[bank].T[0].L[0].P"]),
+      support-stmt("ultrascale-dedicated-byte-clock", [
+        "N" => "comp.IO_HP[bank].T[0].L[3].N",
+        "P" => "comp.IO_HP[bank].T[0].L[3].P"]),
+      support-stmt("ultrascale-dedicated-byte-clock", [
+        "N" => "comp.IO_HP[bank].T[3].L[0].N",
+        "P" => "comp.IO_HP[bank].T[3].L[0].P"]),
+      support-stmt("ultrascale-dedicated-byte-clock", [
+        "N" => "comp.IO_HP[bank].T[3].L[3].N",
+        "P" => "comp.IO_HP[bank].T[3].L[3].P"])
+      ]))
+  else if length(dbc-banks) == 1 :
+    val bank-id = to-tuple(dbc-banks)[0]
+    add-all(stmts, [
+      support-stmt("ultrascale-dedicated-byte-clock", [
+        "N" => to-string("comp.IO_HP[%_].T[0].L[0].N" % [bank-id]),
+        "P" => to-string("comp.IO_HP[%_].T[0].L[0].P" % [bank-id])]),
+      support-stmt("ultrascale-dedicated-byte-clock", [
+        "N" => to-string("comp.IO_HP[%_].T[0].L[3].N" % [bank-id]),
+        "P" => to-string("comp.IO_HP[%_].T[0].L[3].P" % [bank-id])]),
+      support-stmt("ultrascale-dedicated-byte-clock", [
+        "N" => to-string("comp.IO_HP[%_].T[3].L[0].N" % [bank-id]),
+        "P" => to-string("comp.IO_HP[%_].T[3].L[0].P" % [bank-id])]),
+      support-stmt("ultrascale-dedicated-byte-clock", [
+        "N" => to-string("comp.IO_HP[%_].T[3].L[3].N" % [bank-id]),
+        "P" => to-string("comp.IO_HP[%_].T[3].L[3].P" % [bank-id])])
+      ])
+
+  if length(qbc-banks) > 1 :
+    val bank-ids-str = compactify-for-loop-indices(qbc-banks)
+    add(stmts, for-stmt("bank", bank-ids-str, [
+      support-stmt("ultrascale-quad-byte-clock", [
+        "N" => "comp.IO_HP[bank].T[1].L[0].N",
+        "P" => "comp.IO_HP[bank].T[1].L[0].P"]),
+      support-stmt("ultrascale-quad-byte-clock", [
+        "N" => "comp.IO_HP[bank].T[1].L[3].N",
+        "P" => "comp.IO_HP[bank].T[1].L[3].P"]),
+      support-stmt("ultrascale-quad-byte-clock", [
+        "N" => "comp.IO_HP[bank].T[2].L[0].N",
+        "P" => "comp.IO_HP[bank].T[2].L[0].P"]),
+      support-stmt("ultrascale-quad-byte-clock", [
+        "N" => "comp.IO_HP[bank].T[2].L[3].N",
+        "P" => "comp.IO_HP[bank].T[2].L[3].P"])
+      ]))
+  else if length(qbc-banks) == 1 :
+    val bank-id = to-tuple(qbc-banks)[0]
+    add-all(stmts, [
+      support-stmt("ultrascale-quad-byte-clock", [
+        "N" => to-string("comp.IO_HP[%_].T[1].L[0].N" % [bank-id]),
+        "P" => to-string("comp.IO_HP[%_].T[1].L[0].P" % [bank-id])]),
+      support-stmt("ultrascale-quad-byte-clock", [
+        "N" => to-string("comp.IO_HP[%_].T[1].L[3].N" % [bank-id]),
+        "P" => to-string("comp.IO_HP[%_].T[1].L[3].P" % [bank-id])]),
+      support-stmt("ultrascale-quad-byte-clock", [
+        "N" => to-string("comp.IO_HP[%_].T[2].L[0].N" % [bank-id]),
+        "P" => to-string("comp.IO_HP[%_].T[2].L[0].P" % [bank-id])]),
+      support-stmt("ultrascale-quad-byte-clock", [
+        "N" => to-string("comp.IO_HP[%_].T[2].L[3].N" % [bank-id]),
+        "P" => to-string("comp.IO_HP[%_].T[2].L[3].P" % [bank-id])])
+      ])
+
+  add-support-func(outline, "byte-clock", stmts)
+
+defn make-pci-reset-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>) -> False :
+  val pci-reset-pins = to-tuple $ filter({any?({_ is PCIResetType}, funcs(_))}, io-pins)
+  if length(pci-reset-pins) != 2 :
+    throw(Exception("Expected 2 PCI reset pins but found %_: %_" % [length(pci-reset-pins), pci-reset-pins]))
+  for p in pci-reset-pins do :
+    match(p) :
+      (p:USHPDiffIOPin) :
+        if bank(p) != 65 :
+          throw(Exception("PCI reset pin %_ is not on bank 65" % [p]))
+        if in-short-bank?(p) :
+          throw(Exception("PCI reset pin %_ is in a short bank" % [p]))
+        if index(p) != 24 :
+          throw(Exception("PCI reset pin %_ index is not 24" % [p]))
+      (p) :
+        throw(Exception("PCI reset pin %_ is not a high-performance differential pin" % [p]))
+
+  add-support-func(outline, "pci-reset", [
+    support-stmt("ultrascale-pci-reset", [
+      "N" => "comp.IO_HP[65].T[3].L[5].N"
+      "P" => "comp.IO_HP[65].T[3].L[5].P"
+      ])])
+
+defn make-adc-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>) -> False :
+  val stmts = Vector<Expr>()
+
+  val hp-bc-table = HashTable-init<Int,IntSet>({IntSet()})
+  val hd-bc-table = HashTable-init<Int,IntSet>({IntSet()})
+  for p in io-pins do :
+    if any?({_ is AnalogInputType}, funcs(p)) :
+      match(p) :
+        (p:USHPDiffIOPin) :
+          if in-short-bank?(p) :
+            throw(Exception("Analog input pin %_ is in a short bank" % [p]))
+          add(hp-bc-table[bank(p)], index(p))
+        (p:USHPSingleIOPin) :
+          throw(Exception("Analog input pin %_ is not differential" % [p]))
+        (p:USHDIOPin) :
+          add(hd-bc-table[bank(p)], index(p))
+
+  if length(hp-bc-table) > 0 :
+    val bc-sets = qsort(key, hp-bc-table)
+    val sorted-group-vals = for kv in bc-sets seq :
+      val bid = key(kv)
+      val channels = qsort(value(kv))
+      val group-ids = to-tuple $ seq(group-and-index, channels)
+      bid => group-ids
+    val loop-str = to-string("[%,]" % [sorted-group-vals])
+    add(stmts, for-stmt("kv", loop-str, [
+      "val bank = key(kv)"
+      for-stmt("gc", "value(kv)", [
+        "val [group, channel] = gc",
+        support-stmt("adc-pair", [
+          "adc-pair.N" => "comp.IO_HP[bank].T[group].L[channel].N",
+          "adc-pair.P" => "comp.IO_HP[bank].T[group].L[channel].P"])
+        ])
+      ]))
+  if length(hd-bc-table) > 0 :
+    val bc-sets = qsort(key, hd-bc-table)
+    val sorted-group-vals = for kv in bc-sets seq :
+      val bid = key(kv)
+      val channels = qsort(value(kv))
+      bid => channels
+    val loop-str = to-string("[%,]" % [sorted-group-vals])
+    add(stmts, for-stmt("kv", loop-str, [
+      "val bank = key(kv)"
+      for-stmt("channel", "value(kv)", [
+        support-stmt("adc-pair", [
+          "adc-pair.N" => "comp.IO_HD[bank].L[channel].N",
+          "adc-pair.P" => "comp.IO_HD[bank].L[channel].P"])
+        ])
+      ]))
+
+  add-support-func(outline, "adc", stmts)
+
+defn make-i2c-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>) -> False :
+  val sda-pin? = find({any?({_ is I2CDataType}, funcs(_))}, io-pins)
+  val scl-pin? = find({any?({_ is I2CClockType}, funcs(_))}, io-pins)
+  val stmt = match(sda-pin?, scl-pin?) :
+    (p1:USIOPin, p2:USIOPin) :
+      support-stmt("i2c", [
+        "sda" => to-string("comp.%_" % [final-ref(p1)])
+        "scl" => to-string("comp.%_" % [final-ref(p2)])
+        ])
+    (_0:False, _1) :
+      throw(Exception("I2C data pin not found"))
+    (_0, _1:False) :
+      throw(Exception("I2C clock pin not found"))
+  add-support-func(outline, "i2c", [stmt])
+
+defn make-pmbus-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>) -> False :
+  val stmts = Vector<Expr>()
+  for p in filter({any?({_ is PMBusAlertType}, funcs(_))}, io-pins) do :
+    add(stmts, support-stmt("ultrascale-pmbus-alert", [
+      "p" => to-string("comp.%_" % [final-ref(p)])
+      ]))
+  add-support-func(outline, "pmbus-alert", stmts)
+
+;============================================================
+;========================= Helpers ==========================
+;============================================================
+
+defn set-final-ref (p:UltrascalePin, s:Printable) -> False :
+  set-final-ref(p, to-string(s))
+
+defn add-support-func (outline:ComponentOutline, name:String, stmts:Seqable<Expr>) -> False :
+  add(support-stmts(outline), "make-%_-supports(comp)" % [name])
+  add(support-funcs(outline), BodyExpr("defn make-%_-supports (comp:Instance) :" % [name],
+    [BodyExpr("inside pcb-module :", to-tuple(stmts))]))
+
+;Returns the group number (0 through 3) and group channel index (0 through 5)
+;for the given HP diff IO pin bank channel index (1 through 24)
+defn group-and-index (ci:Int) -> [Int,Int] :
+  if ci <= 0 or ci > 24 :
+    throw(Exception("Invalid bank diff-pair channel index %_" % [ci]))
+  val grp = (ci - 1) / 6
+  val grp-index = (ci - 1) % 6
+  [grp, grp-index]
