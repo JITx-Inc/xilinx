@@ -352,9 +352,6 @@ defn make-io-pin-properties (outline:ComponentOutline, io-pins:Vector<USIOPin>) 
   ibi
 
 defn make-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>, io-bank-ids:IOBankIDs) -> False :
-  defn get-ref (p:USIOPin) -> String :
-    append("comp.", final-ref(p))
-
   make-clock-supports(outline, io-pins)
   make-dci-vref-supports(outline, io-pins)
   make-byte-clock-supports(outline, io-pins)
@@ -362,6 +359,7 @@ defn make-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>, io-bank-i
   make-adc-supports(outline, io-pins)
   make-i2c-supports(outline, io-pins)
   make-pmbus-supports(outline, io-pins)
+  make-gpio-supports(outline, io-pins, io-bank-ids)
 
 defn make-clock-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>) -> False :
   val stmts = Vector<Expr>()
@@ -669,6 +667,58 @@ defn make-pmbus-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>) -> 
       "p" => to-string("comp.%_" % [final-ref(p)])
       ]))
   add-support-func(outline, "pmbus-alert", stmts)
+
+defn make-gpio-supports (outline:ComponentOutline, io-pins:Vector<USIOPin>, io-bank-ids:IOBankIDs) -> False :
+  val stmts = Vector<Expr>()
+
+  val hd-banks = high-density-banks(io-bank-ids)
+  if length(hd-banks) > 0 :
+    add(stmts, for-stmt("bank", compactify-for-loop-indices(hd-banks), [
+      for-stmt("i", "1 through 12", [
+        support-stmt("gpio", [
+          "gpio" => "comp.IO_HD[bank].L[i].P"
+        ]),
+        support-stmt("gpio", [
+          "gpio" => "comp.IO_HD[bank].L[i].N"
+        ])
+      ])
+      ]))
+
+  val hp-banks = high-perf-banks(io-bank-ids)
+  if length(hp-banks) > 0 :
+    add(stmts, for-stmt("bank", compactify-for-loop-indices(hp-banks), [
+      for-stmt("i", "0 to 4", [
+        for-stmt("j", "0 to 6", [
+          support-stmt("gpio", [
+            "gpio" => "comp.IO_HP[bank].T[i].L[j].P"
+          ]),
+          support-stmt("gpio", [
+            "gpio" => "comp.IO_HP[bank].T[i].L[j].N"
+          ])
+          ])
+        support-stmt("gpio", [
+          "gpio" => "comp.IO_HP[bank].T[i].S"
+          ]),
+        ])
+      ]))
+
+  val short-banks = short-high-perf-banks(io-bank-ids)
+  if length(short-banks) > 0 :
+    add(stmts, for-stmt("bank", compactify-for-loop-indices(short-banks), [
+      for-stmt("i", "0 to 2", [
+        support-stmt("gpio", [
+          "gpio" => "comp.IO_HP_S[bank].L[i].P"
+          ]),
+        support-stmt("gpio", [
+          "gpio" => "comp.IO_HP_S[bank].L[i].N"
+          ]),
+        support-stmt("gpio", [
+          "gpio" => "comp.IO_HP_S[bank].L[i].S"
+          ]),
+        ])
+      ]))
+
+  add-support-func(outline, "gpio", stmts)
 
 ;============================================================
 ;========================= Helpers ==========================
