@@ -16,8 +16,8 @@ public val sbva484-bga = create-landpattern $
     num-leads = 22 * 22
     rows = 22
     columns = 22
-    lead-diam = 0.6
-    pitch = 1.0
+    lead-diam = 0.5
+    pitch = 0.8
     package-body =
       PackageBody(
         width = typ(19.0),
