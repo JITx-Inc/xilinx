@@ -176,6 +176,8 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, dedicated-pins:Vec
     val p = group[0]
     match(funcs(p)[0]) :
       (f:JTAGType) :
+        if length(group) > 1 :
+          throw(Exception("Unexpected: multiple pins found with name %_" % [name(p)]))
         val name* = switch(signal(f)) :
           TCK : "PS_JTAG.tck"
           TMS : "PS_JTAG.tms"
@@ -185,73 +187,118 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, dedicated-pins:Vec
         add-pin-prop-row(outline, name*, pad(p))
 
       (f:PowerRailType) :
-        val [name*, bank] = match(bank(f)) :
-          (bank:One<Int>) :
-            val name* = to-string $ "%_[%_]" % [strip-last-comp(name(p)), value(bank)]
-            [name*, value(bank)]
-          (_) :
-            [name(p), 0]
-        set-final-ref(p, name*)
-        add-pin-prop-row(outline, name*, pad(p), bank)
+        if length(group) > 1 :
+          ;Multi-pad pin
+          val grp-name = let :
+            val grp-name = strip-bank(name(p), bank(p))
+            if grp-name == "VCCO" :
+              name(p) ;do not strip bank number from VCCO pin
+            else :
+              grp-name
+          for (i in 0 to false, p* in group) do :
+            val name* = "%_[%_]" % [grp-name, i]
+            set-final-ref(p*, name*)
+            add-pin-prop-row(outline, name*, pad(p*), bank(p*), symbol-bank = One(grp-name))
+          add-module-pin-and-net-loop(outline, grp-name)
+        else :
+          val [name*, bank] = match(bank(f)) :
+            (bank:One<Int>) :
+              val name* = to-string $ "%_[%_]" % [strip-last-comp(name(p)), value(bank)]
+              [name*, value(bank)]
+            (_) :
+              [name(p), 0]
+          set-final-ref(p, name*)
+          add-pin-prop-row(outline, name*, pad(p), bank)
 
       (f:PSIOPowerSupplyType) :
-        val name* = to-string $ "VCCO_PSIO[%_]" % [index(f)]
-        set-final-ref(p, name*)
-        add-pin-prop-row(outline, name*, pad(p), bank(f))
+        if length(group) > 1 :
+          ;Multi-pad pin
+          val grp-name = to-string $ "VCCO_PSIO%_" % [index(f)]
+          for (i in 0 to false, p* in group) do :
+            val name* = "%_[%_]" % [grp-name, i]
+            set-final-ref(p*, name*)
+            add-pin-prop-row(outline, name*, pad(p*), bank(p*), symbol-bank = One(grp-name))
+          add-module-pin-and-net-loop(outline, grp-name)
+        else :
+          val name* = to-string $ "VCCO_PSIO[%_]" % [index(f)]
+          set-final-ref(p, name*)
+          add-pin-prop-row(outline, name*, pad(p), bank(f))
 
       (f:PSDDRDataType) :
+        if length(group) > 1 :
+          throw(Exception("Unexpected: multiple pins found with name %_" % [name(p)]))
         val name* = "PS_DDR_DQ[%_]" % [index(f)]
         set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRStrobeType) :
+        if length(group) > 1 :
+          throw(Exception("Unexpected: multiple pins found with name %_" % [name(p)]))
         add(dqs-indices, index(f))
         val name* = to-string $ "PS_DDR_DQS[%_].%_" % [index(f), to-letter(polarity(f))]
         set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRAddrType) :
+        if length(group) > 1 :
+          throw(Exception("Unexpected: multiple pins found with name %_" % [name(p)]))
         val name* = "PS_DDR_A[%_]" % [index(f)]
         set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRBankAddrType) :
+        if length(group) > 1 :
+          throw(Exception("Unexpected: multiple pins found with name %_" % [name(p)]))
         val name* = "PS_DDR_BA[%_]" % [index(f)]
         set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRBankGroupType) :
+        if length(group) > 1 :
+          throw(Exception("Unexpected: multiple pins found with name %_" % [name(p)]))
         val name* = "PS_DDR_BG[%_]" % [index(f)]
         set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRClockType) :
+        if length(group) > 1 :
+          throw(Exception("Unexpected: multiple pins found with name %_" % [name(p)]))
         add(ddr-clock-indices, index(f))
         val name* = to-string $ "PS_DDR_CK[%_].%_" % [index(f), to-letter(polarity(f))]
         set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRChipSelectType) :
+        if length(group) > 1 :
+          throw(Exception("Unexpected: multiple pins found with name %_" % [name(p)]))
         val name* = "PS_DDR_CS_N[%_]" % [index(f)]
         set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRDataMaskType) :
+        if length(group) > 1 :
+          throw(Exception("Unexpected: multiple pins found with name %_" % [name(p)]))
         val name* = "PS_DDR_DM[%_]" % [index(f)]
         set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSDDRTerminationControlType) :
+        if length(group) > 1 :
+          throw(Exception("Unexpected: multiple pins found with name %_" % [name(p)]))
         val name* = "PS_DDR_ODT[%_]" % [index(f)]
         set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:PSMultiplexedIOType) :
+        if length(group) > 1 :
+          throw(Exception("Unexpected: multiple pins found with name %_" % [name(p)]))
         val name* = "PS_MIO[%_]" % [index(f)]
         set-final-ref(p, name*)
         add-pin-prop-row(outline, name*, pad(p), bank(p))
 
       (f:TransceiverClockType) :
+        if length(group) > 1 :
+          throw(Exception("Unexpected: multiple pins found with name %_" % [name(p)]))
         val ps-str =
           if processor-system?(f) :
             add(ps-gt-clock-indices, bank(f))
@@ -266,6 +313,8 @@ defn make-dedicated-pin-properties (outline:ComponentOutline, dedicated-pins:Vec
         add-pin-prop-row(outline, name*, pad(p), bank(f))
 
       (f:TransceiverQuadType) :
+        if length(group) > 1 :
+          throw(Exception("Unexpected: multiple pins found with name %_" % [name(p)]))
         val ps-str = "PS_" when processor-system?(f) else ""
         switch(class(f)) :
           GTR : add(gtr-banks, bank(f))

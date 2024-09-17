@@ -104,6 +104,14 @@ public defn group-by-bundle<?K,?V> (key-fn:(V -> ?K|False), xs:Seqable<?V>)
 public defn strip-last-comp (name:String) -> String :
   name[0 to last-index-of-char(name, '_')]
 
+public defn strip-bank (name:String, bank:Maybe<Int>) -> String :
+  match(last-index-of-char(name, '_'), bank) :
+    (i:Int, b:One<Int>) :
+      if name[(i + 1) to false] == to-string(value(b)) :
+        name[0 to i]
+      else : name
+    (i, b) : name
+
 ;Group a set of indices into consecutive ranges where possible
 ;Sorts the input before compacting
 public defn compactify (indices:Seqable<Int>) -> Tuple<Int|Range> :
