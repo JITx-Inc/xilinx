@@ -1,0 +1,326 @@
+defpackage xilinx/platforms/ultrascale/parser :
+  import core
+  import collections
+  import maybe-utils
+
+  import pcre
+
+  import xilinx/pinouts
+  import xilinx/pin-ir
+  import xilinx/pad-ref
+  import xilinx/parser-utilities
+  import xilinx/platforms/ultrascale/types
+
+;============================================================
+;======================= Pin Parsing ========================
+;============================================================
+
+doc: \<DOC>
+Parse a pin descriptor into an Ultrascale pin
+<DOC>
+public defn parse (pd:PinDescriptor) -> UltrascalePin :
+  val name = /name(pd)
+  val [name*, bank?] = split-on-bank(name)
+
+  defn parse-dedicated () -> Maybe<USDedicatedPin> :
+    match(extract-dedicated-funcs(name)) :
+      (funcs:One<Tuple<SpecialFunction>>) :
+        One(USDedicatedPin(name, PadRef(pin-ref(pd)), bank?, value(funcs)))
+      (_) :
+        None()
+
+  defn parse-io () -> Maybe<USIOPin> :
+    if prefix?(name, "IO_") :
+      One(extract-io-pin(pd))
+    else :
+      None()
+
+  ;Try each parse strategy, return first successful result
+  match(first({_()}, [parse-dedicated, parse-io])) :
+    (p:One<UltrascalePin>) : value(p)
+    (_) : throw(Exception("Could not parse pin descriptor %_" % [pd]))
+
+;============================================================
+;================== Dedicated Pin Parsing ===================
+;============================================================
+
+defn parse-int (type:Int -> SpecialFunction) -> (Tuple<String> -> SpecialFunction) :
+  fn (comps:Tuple<String>) : type(to-int!(comps[0]))
+
+defn parse-vcco-psio (comps:Tuple<String>) -> PSIOPowerSupplyType :
+  val index = to-int!(comps[0])
+  val bank = to-int!(comps[1])
+  PSIOPowerSupplyType(index, bank)
+
+defn parse-ddr-dqs (comps:Tuple<String>) -> PSDDRStrobeType :
+  val polarity = letter-to-polarity(comps[0])
+  val index = to-int!(comps[1])
+  PSDDRStrobeType(index, polarity)
+
+defn parse-ddr-clock (comps:Tuple<String>) -> PSDDRClockType :
+  val polarity = Diff-N when comps[0] == "_N" else Diff-P
+  val index = to-int!(comps[1])
+  PSDDRClockType(index, polarity)
+
+defn parse-serial-quad (comps:Tuple<String>) -> TransceiverQuadType :
+  val ps? = comps[0] == "PS_"
+  val class = switch(comps[1]) :
+    "R" : GTR
+    "Y" : GTY
+    "H" : GTH
+  val dir = switch(comps[2]) :
+    "TX" : GTTX
+    "RX" : GTRX
+  val polarity = letter-to-polarity(comps[3])
+  val index = to-int!(comps[4])
+  val bank = to-int!(comps[5])
+  TransceiverQuadType(bank, class, index, dir, polarity, ps?)
+
+defn parse-serial-clock (comps:Tuple<String>) -> TransceiverClockType :
+  val ps? = comps[0] == "PS_"
+  val index = to-int!(comps[1])
+  val polarity = letter-to-polarity(comps[2])
+  val bank = to-int!(comps[3])
+  TransceiverClockType(bank, index, polarity, ps?)
+
+;Dedicated pin name pattern to special function map
+val dedicated-map:Tuple<KeyValue<String,SpecialFunction|Tuple<SpecialFunction>|(Tuple<String> -> SpecialFunction)>> = [
+  "NC" => NoConnectType()
+
+  ; Config
+  "PUDC_B" => ConfigType()
+  "POR_OVERRIDE" => ConfigType()
+  "PS_DONE" => ConfigType()
+  "PS_ERROR_OUT" => ConfigType()
+  "PS_ERROR_STATUS" => ConfigType()
+  "PS_INIT_B" => ConfigType()
+  "PS_JTAG_TCK" => JTAGType(TCK)
+  "PS_JTAG_TDI" => JTAGType(TDI)
+  "PS_JTAG_TDO" => JTAGType(TDO)
+  "PS_JTAG_TMS" => JTAGType(TMS)
+  "PS_MODE([0-3])" => parse-int(PSMultiplexedIOModeType)
+  "PS_PADI" => ConfigType()
+  "PS_PADO" => ConfigType()
+  "PS_POR_B" => ConfigType()
+  "PS_PROG_B" => ConfigType()
+  "PS_REF_CLK" => ConfigType()
+  "PS_SRST_B" => ConfigType()
+
+  ; Power
+  "GND" => GroundType()
+  "RSVDGND" => GroundType()
+  "VCCINT" => PowerRailType()
+  "VCCINT_IO" => PowerRailType()
+  "VCCINT_VCU" => PowerRailType()
+  "VCCAUX" => PowerRailType()
+  "VCCAUX_IO" => PowerRailType()
+  "VCCBRAM" => PowerRailType()
+  "VREF_(\\d+)" => parse-int(PowerRailType)
+  "VCC_PSAUX" => PowerRailType()
+  "VCC_PSBATT" => PowerRailType()
+  "VCC_PSDDR_PLL" => PowerRailType()
+  "VCC_PSPLL" => PowerRailType()
+  "VCC_PSINTFP" => PowerRailType()
+  "VCC_PSINTFP_DDR" => PowerRailType()
+  "VCC_PSINTLP" => PowerRailType()
+  "VCCO_(\\d+)" => parse-int(PowerRailType)
+  "VCCO_PSIO(\\d+)_(\\d+)" => parse-vcco-psio
+  "VCCO_PSDDR_(\\d+)" => parse-int(PowerRailType)
+
+  ; Analog
+  "VCCADC" => [PowerRailType(), ADCType()]
+  "GNDADC" => [PowerRailType(), ADCType()]
+  "VCC_PSADC" => [PowerRailType(), ADCType()]
+  "GND_PSADC" => [PowerRailType(), ADCType()]
+  "VP" => [ADCType(), AnalogInputType(16, Diff-P)]
+  "VN" => [ADCType(), AnalogInputType(16, Diff-N)]
+  "VREFP" => [ADCType(), AnalogRefType(Diff-P)]
+  "VREFN" => [ADCType(), AnalogRefType(Diff-N)]
+  "DXP" => TempDiodeType(Diff-P)
+  "DXN" => TempDiodeType(Diff-N)
+
+  ; DDR
+  "PS_DDR_DQ(\\d+)" => parse-int(PSDDRDataType)
+  "PS_DDR_DQS_([NP])(\\d+)" => parse-ddr-dqs
+  "PS_DDR_ALERT_N" => PSDDRAlertType()
+  "PS_DDR_ACT_N" => PSDDRActivationType()
+  "PS_DDR_A(\\d+)" => parse-int(PSDDRAddrType)
+  "PS_DDR_BA(\\d+)" => parse-int(PSDDRBankAddrType)
+  "PS_DDR_BG(\\d+)" => parse-int(PSDDRBankGroupType)
+  "PS_DDR_CK(_N|)(\\d+)" => parse-ddr-clock
+  "PS_DDR_CKE(\\d+)" => parse-int(PSDDRClockEnableType)
+  "PS_DDR_CS_N(\\d+)" => parse-int(PSDDRChipSelectType)
+  "PS_DDR_DM(\\d+)" => parse-int(PSDDRDataMaskType)
+  "PS_DDR_ODT(\\d+)" => parse-int(PSDDRTerminationControlType)
+  "PS_DDR_PARITY" => PSDDRParityType()
+  "PS_DDR_RAM_RST_N" => PSDDRResetType()
+  "PS_DDR_ZQ" => PSDDRZQType()
+
+  ; Multiplexed I/O
+  "PS_MIO(\\d+)" => parse-int(PSMultiplexedIOType)
+
+  ; Gigabit Serial Transceiver Pins
+  ; Use (PS_|) instead of (PS_)? to guarantee match group creation
+  "MGT(RREF|AVTTRCAL)(_[LR][NS]?)?" => TransceiverRefType()
+  "PS_MGTRREF_(\\d+)" => TransceiverRefType()
+  "MGT(AVCC|AVTT|VCCAUX)_[LR][NS]?" => PowerRailType()
+  "PS_MGT(RAVCC|RAVTT)" => PowerRailType()
+  "(PS_|)MGTREFCLK([0-3])([NP])_(\\d+)" => parse-serial-clock
+  "(PS_|)MGT([HPRY])(TX|RX)([NP])([0-3])_(\\d+)" => parse-serial-quad
+]
+
+;Check if the pin name matches a dedicated pin name pattern, return the
+;corresponding special function(s) if so
+defn extract-dedicated-funcs (name:String) -> Maybe<Tuple<SpecialFunction>> :
+  for kv in dedicated-map first :
+    val patt = key(kv)
+    val func = value(kv)
+    val reg-res = re-match(patt, name)
+    if end(reg-res) >= 0 and (length(result(reg-res)[0]) == length(name)) :
+      match(func) :
+        (func:SpecialFunction) :
+          One([func])
+        (func:Tuple<SpecialFunction>) :
+          One(func)
+        (func:(Tuple<String> -> SpecialFunction)) :
+          One([func(to-tuple(result(reg-res)[1 to false]))])
+    else :
+      ;Either no match or not fully consumed
+      None()
+
+;============================================================
+;====================== IO Pin Parsing ======================
+;============================================================
+
+defn parse-analog-io (comps:Tuple<String>) -> AnalogInputType :
+  val index = to-int!(comps[0])
+  val polarity = letter-to-polarity(comps[1])
+  AnalogInputType(index, polarity)
+
+;IO pin name components to special function mapping
+val io-map:Tuple<KeyValue<String,False|SpecialFunction|(Tuple<String> -> SpecialFunction)>> = [
+  "GC" => GlobalClockType()
+  "HDGC" => HighDensityGlobalClockType()
+  "VRP" => DCIRefType(DCI-P)
+  "DBC" => DedicatedByteClockType()
+  "QBC" => QuadByteClockType()
+  "PERSTN([01])" => parse-int(PCIResetType)
+  "AD(\\d+)([NP])" => parse-analog-io
+  "I2C" => false ;ignore, next component is either SCLK or SDA
+  "SCLK" => I2CClockType()
+  "SDA" => I2CDataType()
+  "SMBALERT" => PMBusAlertType()
+  ]
+;Converts the multi-function substring of a pin name into a tuple of special
+;functions
+;The substring *must* start with "_" if it is not empty
+defn parse-io-funcs (multi-func-substr:String, full-name:String) -> Tuple<SpecialFunction> :
+  val comps = to-tuple(split(multi-func-substr, "_"))[1 to false]
+  val funcs = Vector<SpecialFunction>()
+  for comp in comps do :
+    val matched? = for kv in io-map any? :
+      val patt = key(kv)
+      val func = value(kv)
+      val reg-res = re-match(patt, comp)
+      if end(reg-res) >= 0 and (result(reg-res)[0] == comp) :
+        match(func) :
+          (func:SpecialFunction) :
+            add(funcs, func)
+          (func:(Tuple<String> -> SpecialFunction)) :
+            add(funcs, func(to-tuple(result(reg-res)[1 to false])))
+          (func:False) :
+            ;Do nothing
+            false
+        true
+      else :
+        false
+    if not matched? :
+      throw(Exception("Could not parse multi-function component '%_' of pin \
+        '%_'" % [comp, full-name]))
+  to-tuple(funcs)
+
+val io-hp-diff-patt = "IO_L(\\d+)([NP])_T([0-3])([LU])_N(\\d+)((?:_.*)*)_(\\d+)"
+val io-hp-single-patt = "IO_T([0-3])([LU])_N(\\d+)((?:_.*)*)_(\\d+)"
+val io-hd-patt = "IO_L(\\d+)([NP])((?:_.*)*)_(\\d+)"
+doc: \<DOC>
+Parses an Ultrascale IO pin
+
+High-performance differential pin name format:
+IO_L[1:24][P/N]_T[0:3][U/L]_N[0:12]_[multi-function]_[bank number]
+
+High-performance single-ended pin name format:
+IO_T[0:3][U/L]_N[0:12]_[multi-function]_[bank number]
+
+High-density differential pin name format:
+IO_L[1:24][P/N]_[multi-function]_[bank number]
+
+where:
+- L[1:24] = diff pair index
+- P/N = diff polarity
+- T[0:3] = memory byte group
+- U/L = nibble location (upper/lower)
+- N = pin number (within byte group)
+
+Multi-function groups are additional auxiliary functions which the pin supports
+<DOC>
+defn extract-io-pin (pd:PinDescriptor) -> USIOPin :
+  val name = /name(pd)
+
+  defn parse-hp-diff () -> Maybe<USHPDiffIOPin> :
+    val rr = re-match(io-hp-diff-patt, name)
+    if end(rr) >= 0 and (length(result(rr)[0]) == length(name)) :
+      val comps = to-tuple(result(rr))[1 to false]
+      val diff-index = to-int!(comps[0])
+      val polarity = letter-to-polarity(comps[1])
+      val group-index = to-int!(comps[2])
+      val nibble = letter-to-nibble(comps[3])
+      val pin-index = to-int!(comps[4])
+      val funcs = parse-io-funcs(comps[5], name)
+      val bank = to-int!(comps[6])
+      One(USHPDiffIOPin(name, PadRef(pin-ref(pd)), bank, diff-index, polarity,
+        group-index, nibble, funcs))
+    else :
+      None()
+
+  defn parse-hp-single () -> Maybe<USHPSingleIOPin> :
+    val rr = re-match(io-hp-single-patt, name)
+    if end(rr) >= 0 and (length(result(rr)[0]) == length(name)) :
+      val comps = to-tuple(result(rr))[1 to false]
+      val group-index = to-int!(comps[0])
+      val nibble = letter-to-nibble(comps[1])
+      val pin-index = to-int!(comps[2])
+      val funcs = parse-io-funcs(comps[3], name)
+      val bank = to-int!(comps[4])
+      One(USHPSingleIOPin(name, PadRef(pin-ref(pd)), bank, group-index, nibble,
+        funcs))
+    else :
+      None()
+
+  defn parse-hd () -> Maybe<USHDIOPin> :
+    val rr = re-match(io-hd-patt, name)
+    if end(rr) >= 0 and (length(result(rr)[0]) == length(name)) :
+      val comps = to-tuple(result(rr))[1 to false]
+      val diff-index = to-int!(comps[0])
+      val polarity = letter-to-polarity(comps[1])
+      val funcs = parse-io-funcs(comps[2], name)
+      val bank = to-int!(comps[3])
+      One(USHDIOPin(name, PadRef(pin-ref(pd)), bank, diff-index, polarity,
+        funcs))
+    else :
+      None()
+
+  match(first({_()}, [parse-hp-diff, parse-hp-single, parse-hd])) :
+    (p:One<USIOPin>) : value(p)
+    (_) :
+      throw(Exception("IO pin name '%_' does not match any IO pin name patterns"
+        % [name]))
+
+;============================================================
+;======================== Utilities =========================
+;============================================================
+
+public defn letter-to-nibble (str:String) -> NibbleLocation :
+  switch(str) :
+    "U" : UpperNibble
+    "L" : LowerNibble
+    else : throw(Exception("Invalid nibble location: '%_'" % [str]))

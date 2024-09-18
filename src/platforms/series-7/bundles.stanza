@@ -1,0 +1,88 @@
+#use-added-syntax(jitx)
+defpackage xilinx/platforms/series-7/bundles :
+  import core
+  import collections
+
+  import jitx
+  import jitx/commands
+
+  import jsl/bundles
+
+public pcb-bundle diff-gpio :
+  port diff-gpio : diff-pair
+
+public pcb-bundle virtex-7-io-bank :
+  port S : pin[[0 25]]
+  port D : diff-pair[[1 through 24]]
+
+public pcb-bundle virtex-7-gt-quad :
+  port C : lane-pair[4]
+
+public pcb-bundle virtex-7-gt-clock :
+  port I : diff-pair[2]
+
+;8, 16, or 32 bit width
+public pcb-bundle virtex-7-config-data-bus (data-width:Int) :
+  port D : pin[data-width]
+
+public pcb-bundle virtex-7-serial-config-data :
+  port DOUT : pin ; data out
+  port DIN : pin  ; data in
+
+public pcb-bundle virtex-7-spi :
+  port DOUT : pin ; data out
+  port FCS : pin  ; chip select
+  port MOSI : pin ; master-out slave-in
+  port DIN : pin  ; data in
+
+public pcb-bundle virtex-7-select-map-control :
+  port CSI : pin  ; chip select in
+  port CSO : pin  ; chip select out
+  port RDWR : pin ; read/write direction
+
+public pcb-bundle virtex-7-bpi-control :
+  port ADV : pin ; address output valid
+  port FCS : pin ; chip select
+  port FOE : pin ; output enable
+  port FWE : pin ; write enable
+
+public pcb-bundle virtex-7-bpi-address :
+  port ADDR : pin[29]
+
+public pcb-bundle virtex-7-pull-up-during-config :
+  port PUDC : pin
+
+public pcb-bundle virtex-7-external-master-clock :
+  port EMCCLK : pin
+
+public pcb-bundle virtex-7-revision-select :
+  port RS : pin[2]
+
+public pcb-bundle virtex-7-vref :
+  port VREF : pin
+
+public pcb-bundle virtex-7-memory-strobe :
+  port DQS : diff-pair
+
+public pcb-bundle virtex-7-memory-byte-pin :
+  port MBP : pin
+
+public pcb-bundle virtex-7-memory-byte-group :
+  port DQS : diff-pair
+  port P : pin[8]
+
+public pcb-bundle virtex-7-memory-byte-group-with-vref :
+  port G : virtex-7-memory-byte-group
+  port VREF : pin
+
+public pcb-bundle virtex-7-single-region-clock :
+  port SRCC : pin
+
+public pcb-bundle virtex-7-multi-region-clock :
+  port MRCC : pin
+
+public pcb-bundle virtex-7-dci-vref-n :
+  port VRN : pin
+
+public pcb-bundle virtex-7-dci-vref-p :
+  port VRP : pin

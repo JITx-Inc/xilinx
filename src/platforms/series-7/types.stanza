@@ -1,0 +1,119 @@
+defpackage xilinx/platforms/series-7/types :
+  import core
+  import collections
+
+  import xilinx/pin-ir
+
+doc: \<DOC>
+Clock Input Function Type
+
+The 7-series FPGA's support two different clock
+input special functions:
+
+1. Multi-Region Clocks
+2. Single-Region Clocks
+<DOC>
+public deftype ClockInputType <: SpecialFunction
+public defstruct MultiRegionClockType <: ClockInputType
+with:
+  printer => true
+public defstruct SingleRegionClockType <: ClockInputType
+with:
+  printer => true
+
+
+doc: \<DOC>
+Memory Group Type
+
+This type is used to outline which byte lane for the memory
+interface that this pin supports.
+<DOC>
+public defstruct MemoryGroupType <: SpecialFunction & IndexableType :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+
+doc: \<DOC>
+Memory Strobe (DQS) Function Type
+<DOC>
+public defstruct MemoryStrobeType <: SpecialFunction
+with:
+  printer => true
+
+public defenum ConfigDataPinType :
+  CONFIG-PUDC   ;pull-up during configuration
+  CONFIG-EMCCLK ;external master clock
+  CONFIG-CSI    ;chip select input
+  CONFIG-CSO    ;chip select output
+  CONFIG-DOUT   ;data output
+  CONFIG-RDWR   ;selectmap read/write direction
+  CONFIG-MOSI   ;SPI master-output slave-input
+  CONFIG-DIN    ;data input
+
+doc: \<DOC>
+Configuration Data Type
+<DOC>
+public defstruct ConfigDataType <: SpecialFunction :
+  type:ConfigDataPinType
+with:
+  printer => true
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; High Performance Transceivers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+public deftype SerialTransceiverType <: SpecialFunction
+
+public defenum GigabitClass:
+  GTP
+  GTX
+  GTH
+
+public defenum GigabitDirection:
+  GTTX
+  GTRX
+
+public defstruct TransceiverQuadType <: SerialTransceiverType & PolarizedType & IndexableType :
+  class:GigabitClass
+  index:Int with: (as-method => true)
+  direction:GigabitDirection
+  polarity:Diff-Polarity with: (as-method => true)
+with:
+  printer => true
+
+public defstruct TransceiverClockType <: SerialTransceiverType & PolarizedType & IndexableType :
+  index:Int with: (as-method => true)
+  polarity:Diff-Polarity with: (as-method => true)
+with:
+  printer => true
+
+public defstruct TransceiverRefType <: SerialTransceiverType
+with:
+  printer => true
+
+;============================================================
+;============== Byte-wide Peripheral Interface ==============
+;============================================================
+
+public defstruct BPIAddressType <: SpecialFunction :
+  index:Int
+with:
+  printer => true
+
+public defstruct BPIAddressValidType <: SpecialFunction
+with:
+  printer => true
+
+public defstruct BPIChipSelectType <: SpecialFunction
+with:
+  printer => true
+
+public defstruct BPIOutputEnableType <: SpecialFunction
+with:
+  printer => true
+
+public defstruct BPIWriteEnableType <: SpecialFunction
+with:
+  printer => true

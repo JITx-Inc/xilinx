@@ -1,0 +1,56 @@
+defpackage xilinx/bundler :
+  import core
+  import collections
+
+;============================================================
+;=========================== API ============================
+;============================================================
+
+;Identifies a unique instance of a bundle
+public defstruct BundleID <: Equalable & Hashable :
+  id:Tuple<String|Int>
+with:
+  equalable => true
+  hashable => true
+
+;K = bundle ID type, V = item type
+public deftype BundleType<K,V>
+;Number of objects in the bundle
+public defmulti width (t:BundleType) -> Int
+;Find the bundle ID and index of the item, if it is in a bundle
+public defmulti in-bundle?<?K,?V> (t:BundleType<?K,?V>, item:V) -> KeyValue<K,Int>|False
+;Group the objects into bundles, ignoring unbundled objects
+;Default implementation is based on the other methods
+public defmulti collect-bundles<?K,?V> (t:BundleType<?K,?V>, items:Seqable<V>) -> Tuple<KeyValue<K,Tuple<V>>>
+
+;Default bundle parser
+defmethod collect-bundles<?K,?V> (t:BundleType<?K,?V>, items:Seqable<V>) -> Tuple<KeyValue<K,Tuple<V>>> :
+  defn set-item (bundle:Array<Maybe<V>>, bid:K, i:Int, item:V) :
+    if i < 0 or i >= length(bundle) :
+      throw(Exception("Invalid index %_ for item %_ in bundle %_ (%_)" % [i, item, bid, t]))
+    match(bundle[i]) :
+      (obj2:One<V>) :
+        throw(Exception("Index %_ for bundle %_ (%_) already filled (%_ -> %_)" % [i, bid, t, item, value(obj2)]))
+      (_:None) :
+        bundle[i] = One(item)
+
+  ;Group items by bundle
+  val bundle-table = HashTable<K,Array<Maybe<V>>>()
+  for item in items do :
+    match(in-bundle?(t, item)) :
+      (kv:KeyValue<K,Int>) :
+        val bid = key(kv)
+        val bundle-index = value(kv)
+        val bundle = set?(bundle-table, bid, {Array<Maybe<V>>(width(t), None())})
+        set-item(bundle, bid, bundle-index, item)
+      (_) : false
+
+  ;Finalize bundles
+  to-tuple $ for kv in bundle-table seq :
+    val bid = key(kv)
+    val arr = value(kv)
+    val bundle = to-tuple $ for (i in 0 to false, item in arr) seq :
+      match(item) :
+        (item:One<V>) : value(item)
+        (_) : throw(Exception("Index %_ for bundle %_ (%_) missing" % [i, bid, t]))
+    bid => bundle

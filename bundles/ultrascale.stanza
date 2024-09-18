@@ -1,0 +1,60 @@
+#use-added-syntax(jitx)
+defpackage bundles/ultrascale :
+  import core
+  import collections
+
+  import jitx
+  import jitx/commands
+
+  import jsl/bundles
+
+public pcb-bundle diff-gpio :
+  port diff-gpio : diff-pair
+
+public pcb-bundle ultrascale-hd-io-bank :
+  port L : diff-pair[[1 through 12]]
+
+public pcb-bundle ultrascale-hp-byte-group :
+  port L : diff-pair[6]
+  port S : pin
+
+public pcb-bundle ultrascale-hp-io-bank :
+  port T : ultrascale-hp-byte-group[4]
+
+public pcb-bundle ultrascale-short-hp-io-bank :
+  port L : diff-pair[2]
+  port S : pin[2]
+
+public pcb-bundle ultrascale-gt-quad :
+  port C : lane-pair[4]
+
+public pcb-bundle ultrascale-gt-clock :
+  port I : diff-pair[2]
+
+public pcb-bundle ultrascale-ps-gt-clock :
+  port I : diff-pair[4]
+
+public pcb-bundle ultrascale-global-clock :
+  port N : pin
+  port P : pin
+
+public pcb-bundle ultrascale-high-density-global-clock :
+  port N : pin
+  port P : pin
+
+public pcb-bundle ultrascale-dci-vref :
+  port p : pin
+
+public pcb-bundle ultrascale-dedicated-byte-clock :
+  port N : pin
+  port P : pin
+
+public pcb-bundle ultrascale-quad-byte-clock :
+  port N : pin
+  port P : pin
+
+public pcb-bundle ultrascale-pci-reset :
+  port p : pin
+
+public pcb-bundle ultrascale-pmbus-alert :
+  port p : pin

@@ -1,0 +1,26 @@
+#use-added-syntax(jitx)
+defpackage landpatterns/sbva484-bga :
+  import core
+  import jitx
+  import jitx/commands
+
+  import jsl/landpatterns
+  import jsl/landpatterns/pad-planner
+  import jsl/landpatterns/pad-island
+
+; Xilinx SBVA484
+; https://docs.amd.com/v/u/en-US/ug1075-zynq-ultrascale-pkg-pinout
+
+public val sbva484-bga = create-landpattern $
+  BGA(
+    num-leads = 22 * 22
+    rows = 22
+    columns = 22
+    lead-diam = 0.5
+    pitch = 0.8
+    package-body =
+      PackageBody(
+        width = typ(19.0),
+        length = typ(19.0),
+        height = min-max(2.21, 2.61))
+    )

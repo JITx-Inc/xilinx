@@ -1,0 +1,342 @@
+defpackage xilinx/platforms/ultrascale/types :
+  import core
+
+  import xilinx/pin-ir
+  import xilinx/pad-ref
+
+;============================================================
+;=========================== Pins ===========================
+;============================================================
+
+public deftype UltrascalePin
+public defmulti name (p:UltrascalePin) -> String
+public defmulti ref-name (p:UltrascalePin) -> String
+defmethod ref-name (p:UltrascalePin) -> String : name(p)
+public defmulti pad (p:UltrascalePin) -> PadRef
+public defmulti funcs (p:UltrascalePin) -> Tuple<SpecialFunction>
+public defmulti final-ref (p:UltrascalePin) -> String
+public defmulti set-final-ref (p:UltrascalePin, s:String) -> False
+
+public defstruct USDedicatedPin <: UltrascalePin :
+  name:String with: (as-method => true)
+  pad:PadRef with: (as-method => true)
+  bank:Maybe<Int>
+  funcs:Tuple<SpecialFunction> with: (as-method => true)
+  final-ref:String with:
+    as-method => true
+    default => ""
+    setter => set-final-ref
+with:
+  printer => true
+
+public deftype USIOPin <: UltrascalePin
+public defmulti bank (p:USIOPin) -> Int
+
+;Ultrascale High-Density I/O Pin
+public defstruct USHDIOPin <: USIOPin :
+  name:String with: (as-method => true)
+  pad:PadRef with: (as-method => true)
+  bank:Int with: (as-method => true)
+  index:Int
+  diff-polarity:Diff-Polarity
+  funcs:Tuple<SpecialFunction> with: (as-method => true)
+  final-ref:String with:
+    as-method => true
+    default => ""
+    setter => set-final-ref
+with:
+  printer => true
+
+defmethod ref-name (p:USHDIOPin) -> String :
+  to-string $ "[%_].L[%_].%_" % [bank(p), index(p),
+    to-letter(diff-polarity(p))]
+
+;Ultrascale High-Performance Differential I/O Pin
+public defstruct USHPDiffIOPin <: USIOPin :
+  name:String with: (as-method => true)
+  pad:PadRef with: (as-method => true)
+  bank:Int with: (as-method => true)
+  index:Int
+  diff-polarity:Diff-Polarity
+  byte-group:Int ; 0 to 3
+  byte-nibble:NibbleLocation
+  funcs:Tuple<SpecialFunction> with: (as-method => true)
+  final-ref:String with:
+    as-method => true
+    default => ""
+    setter => set-final-ref
+  in-short-bank?:True|False with:
+    default => false
+    setter => set-in-short-bank?
+with:
+  printer => true
+
+defmethod ref-name (p:USHPDiffIOPin) -> String :
+  to-string $ "[%_].T[%_].L[%_].%_" % [bank(p), byte-group(p),
+    ((index(p) - 1) % 6), to-letter(diff-polarity(p))]
+
+;Ultrascale High-Performance Single-Ended I/O Pin
+public defstruct USHPSingleIOPin <: USIOPin :
+  name:String with: (as-method => true)
+  pad:PadRef with: (as-method => true)
+  bank:Int with: (as-method => true)
+  byte-group:Int ; 0 to 3
+  byte-nibble:NibbleLocation
+  funcs:Tuple<SpecialFunction> with: (as-method => true)
+  final-ref:String with:
+    as-method => true
+    default => ""
+    setter => set-final-ref
+  in-short-bank?:True|False with:
+    default => false
+    setter => set-in-short-bank?
+with:
+  printer => true
+
+defmethod ref-name (p:USHPSingleIOPin) -> String :
+  to-string $ "[%_].T[%_].S" % [bank(p), byte-group(p)]
+
+public defenum NibbleLocation :
+  UpperNibble
+  LowerNibble
+
+;============================================================
+;==================== Special Functions =====================
+;============================================================
+
+doc: \<DOC>
+Global Clock Type
+<DOC>
+public defstruct GlobalClockType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+High-Density Global Clock Type
+<DOC>
+public defstruct HighDensityGlobalClockType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+Dedicated Byte Clock Type
+<DOC>
+public defstruct DedicatedByteClockType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+Quad Byte Clock Type
+<DOC>
+public defstruct QuadByteClockType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+PCI Express Reset Type
+<DOC>
+public defstruct PCIResetType <: SpecialFunction :
+  index:Int
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System Multiplexed I/O Mode Selection Type
+<DOC>
+public defstruct PSMultiplexedIOModeType <: SpecialFunction :
+  index:Int
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System Multiplexed I/O Type
+<DOC>
+public defstruct PSMultiplexedIOType <: SpecialFunction :
+  index:Int
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System I/O Supply Voltage Type
+<DOC>
+public defstruct PSIOPowerSupplyType <: SpecialFunction :
+  index:Int
+  bank:Int
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Data (DQ) Type
+<DOC>
+public defstruct PSDDRDataType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Strobe (DQS) Type
+<DOC>
+public defstruct PSDDRStrobeType <: IndexableType & PolarizedType & SpecialFunction :
+  index:Int with: (as-method => true)
+  polarity:Diff-Polarity with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Alert Signal Type
+<DOC>
+public defstruct PSDDRAlertType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Activation Command Type
+<DOC>
+public defstruct PSDDRActivationType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Address (A) Type
+<DOC>
+public defstruct PSDDRAddrType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Bank Address (BA) Type
+<DOC>
+public defstruct PSDDRBankAddrType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Bank Group (BG) Type
+<DOC>
+public defstruct PSDDRBankGroupType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Clock (CK) Type
+<DOC>
+public defstruct PSDDRClockType <: IndexableType & PolarizedType & SpecialFunction :
+  index:Int with: (as-method => true)
+  polarity:Diff-Polarity with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Clock Enable (CKE) Type
+<DOC>
+public defstruct PSDDRClockEnableType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Chip Select (CS) Type
+<DOC>
+public defstruct PSDDRChipSelectType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Data Mask (DM) Type
+<DOC>
+public defstruct PSDDRDataMaskType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Memory Termination Control (ODT) Type
+<DOC>
+public defstruct PSDDRTerminationControlType <: IndexableType & SpecialFunction :
+  index:Int with: (as-method => true)
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Parity Signal Type
+<DOC>
+public defstruct PSDDRParityType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR Reset Signal Type
+<DOC>
+public defstruct PSDDRResetType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+Processor System DDR ZQ Calibration Type
+<DOC>
+public defstruct PSDDRZQType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+I2C Clock Type
+<DOC>
+public defstruct I2CClockType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+I2C Data Type
+<DOC>
+public defstruct I2CDataType <: SpecialFunction
+with:
+  printer => true
+
+doc: \<DOC>
+PMBus Alert Interrupt Type
+<DOC>
+public defstruct PMBusAlertType <: SpecialFunction
+with:
+  printer => true
+
+public deftype SerialTransceiverType <: SpecialFunction
+
+public defenum GigabitClass:
+  GTR
+  GTY
+  GTH
+
+public defenum GigabitDirection:
+  GTTX
+  GTRX
+
+public defn to-str (e:GigabitDirection) -> String :
+  switch(e) :
+    GTTX : "TX"
+    GTRX : "RX"
+
+public defstruct TransceiverQuadType <: SerialTransceiverType & PolarizedType & IndexableType :
+  bank:Int
+  class:GigabitClass
+  index:Int with: (as-method => true)
+  direction:GigabitDirection
+  polarity:Diff-Polarity with: (as-method => true)
+  processor-system?:True|False
+with:
+  printer => true
+
+public defstruct TransceiverClockType <: SerialTransceiverType & PolarizedType & IndexableType :
+  bank:Int
+  index:Int with: (as-method => true)
+  polarity:Diff-Polarity with: (as-method => true)
+  processor-system?:True|False
+with:
+  printer => true
+
+public defstruct TransceiverRefType <: SerialTransceiverType
+with:
+  printer => true

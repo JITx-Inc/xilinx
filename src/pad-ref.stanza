@@ -1,0 +1,28 @@
+defpackage xilinx/pad-ref :
+  import core
+  import collections
+
+public defstruct PadRef <: Equalable&Hashable&Comparable<PadRef> :
+  row:String
+  col:Int
+with:
+  equalable => true
+  hashable => true
+
+public defn PadRef (ref-str:String) -> PadRef :
+  defn throw-invalid () -> Void :
+    throw(Exception("Invalid pad reference %_" % [ref-str]))
+  val split = match(index-when(digit?, ref-str)) :
+    (i:Int) : throw-invalid() when i < 1 else i
+    (_) : throw-invalid()
+  val row = ref-str[0 to split]
+  val col = match(to-int(ref-str[split to false])) :
+    (i:Int) : i
+    (_) : throw-invalid()
+  PadRef(row, col)
+
+defmethod compare (a:PadRef, b:PadRef) -> Int :
+  compare([length(row(a)), row(a), col(a)], [length(row(b)), row(b), col(b)])
+
+defmethod print (o:OutputStream, p:PadRef) -> False :
+  print(o, "%_[%_]" % [row(p), col(p)])

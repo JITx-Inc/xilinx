@@ -1,0 +1,183 @@
+defpackage xilinx/generator-utilities :
+  import core
+  import collections
+  import maybe-utils
+
+  import xilinx/bundler
+  import xilinx/pinouts
+  import xilinx/pin-ir
+  import xilinx/pad-ref
+  import xilinx/platforms/ultrascale/types
+  import xilinx/platforms/ultrascale/parser
+
+;============================================================
+;======================= Expressions ========================
+;============================================================
+
+;Generated code statement or group of statements
+public deftype Expr :
+  String <: Expr
+  Printable <: Expr
+
+;Generated statement with a nested body
+public defstruct BodyExpr <: Expr :
+  head:Expr
+  body:Tuple<Expr>
+with:
+  constructor => #BodyExpr
+
+defmethod print (o:OutputStream, x:BodyExpr) -> False :
+  val o2 = IndentedStream(o, 2)
+  print(o, head(x))
+  do(lnprint{o2, _}, body(x))
+
+public defn BodyExpr (head:Expr, body-sections:Seqable<Expr> ...) -> BodyExpr :
+  #BodyExpr(head, to-tuple(cat-all(body-sections)))
+
+;Create a for loop statement
+public defn for-stmt (for-var:Expr, for-list:Expr, body:Seqable<Expr>) -> Expr :
+  BodyExpr(to-string("for %_ in %_ do :" % [for-var, for-list]), body)
+
+;Create a for loop statement with multiple iterators
+public defn for-stmt (for-vars:Seqable<Expr>,
+                      for-lists:Seqable<Expr>,
+                      body:Seqable<Expr>) -> Expr :
+  val var-strs = seq({"%_ in %_" % [_, _]}, for-vars, for-lists)
+  BodyExpr(to-string("for (%,) do :" % [var-strs]), body)
+
+;Create a pin properties table row
+public defn pin-props-stmt (name:Expr, pads:Tuple<PadRef>, xilinx-bank:Int --
+                            symbol-bank:Maybe<Expr> = None(),
+                            mem-byte-grp:Maybe<Int> = None()) -> Expr :
+  val symbol-bank-str = match(symbol-bank) :
+    (b:One<Expr>) : to-string("(Ref(`%_))" % [value(b)])
+    (_) : to-string(xilinx-bank)
+  val mbg-str = maybe-default(mem-byte-grp, "-")
+  "[ %_ | %* | %_ | %_ | %_ ]" % [name, join(pads, " "), symbol-bank-str,
+    xilinx-bank, mbg-str]
+
+;Create a pin declaration
+public defn pin-decl-stmt (name:Expr) -> Expr :
+  "port %_ : pin" % [name]
+
+;Create a port declaration
+public defn port-decl-stmt (name:Expr, type:Expr, indices:Tuple<Int> = []) -> Expr :
+  val index-arr-str = ("[%_]" % [pretty-indices-str(indices)]) when
+    (length(indices) > 0) else ""
+  "port %_ : %_%_" % [name, type, index-arr-str]
+
+;Create a net statement for a multi-pin port
+public defn port-net-loop-stmt (name:Expr) -> Expr :
+  for-stmt("p", "pins(comp.%_)" % [name], ["net (%_ p)" % [name]])
+
+;Create a supports statement
+;The body of the supports will contain "name.key(pair) => value(pair)" for each
+;pair in 'support-pairs'
+;Do not include the bundle name in the key
+public defn support-stmt (name:Expr, support-pairs:Seqable<KeyValue<Expr,Expr>>
+                          -- params:Tuple<Expr> = []) -> Expr :
+  val name* =
+    if length(params) > 0 :
+      to-string $ "%_(%,)" % [name, params]
+    else : name
+  val body = to-tuple $ for pair in support-pairs seq :
+    to-string("%_.%_ => %_" % [name*, key(pair), value(pair)])
+  BodyExpr(to-string("supports %_ :" % [name*]), body)
+
+;============================================================
+;======================== Utilities =========================
+;============================================================
+
+;Groups items into bundles based on a bundle key function
+public defn group-by-bundle<?K,?V> (key-fn:(V -> ?K|False), xs:Seqable<?V>)
+              -> HashTable<K,Vector<V>> :
+  val result = HashTable<K,Vector<V>>()
+  for x in xs do :
+    match(key-fn(x)) :
+      (k:K) :
+        val bundle = set?(result, k, {Vector<V>()})
+        add(bundle, x)
+      (_) :
+        false
+  result
+
+public defn strip-last-comp (name:String) -> String :
+  name[0 to last-index-of-char(name, '_')]
+
+public defn strip-bank (name:String, bank:Maybe<Int>) -> String :
+  match(last-index-of-char(name, '_'), bank) :
+    (i:Int, b:One<Int>) :
+      if name[(i + 1) to false] == to-string(value(b)) :
+        name[0 to i]
+      else : name
+    (i, b) : name
+
+;Group a set of indices into consecutive ranges where possible
+;Sorts the input before compacting
+public defn compactify (indices:Seqable<Int>) -> Tuple<Int|Range> :
+  val result = Vector<Int|Range>()
+  var start:Int|False = false
+  var end:Int|False = false
+  defn finish-current-range () :
+    match(start:Int, end:Int) :
+      if end > (start + 1) :
+        add(result, Range(start, end))
+      else :
+        add(result, start)
+  for i in qsort(indices) do :
+    if i == end :
+      end = i + 1
+    else :
+      finish-current-range()
+      start = i
+      end = i + 1
+  finish-current-range()
+  to-tuple(result)
+
+;Creates a compact indices string, useful for a pin array declarations
+public defn pretty-indices-str (indices:Seqable<Int>) -> String :
+  to-string("[%,]" % [compactify(indices)])
+
+;Creates a compact indices string for a for loop
+public defn compactify-for-loop-indices (indices:Seqable<Int>) -> String :
+  defn make-seqable (x:Int|Range) :
+    match(x) :
+      (x:Int) : [x]
+      (x:Range) : x
+  val indices* = compactify(indices)
+  if length(indices*) == 1 :
+    match(indices*[0]) :
+      (i:Int) : to-string([i])
+      (r:Range) : to-string(r)
+  else :
+    if any?({_ is Range}, indices*) :
+      to-string $ "cat-all([%,])" % [seq(make-seqable, indices*)]
+    else :
+      to-string(indices*)
+
+public defn with-default<?T> (x:?T|False, default:?T) -> T :
+  match(x) :
+    (x:T) : x
+    (_) : default
+
+public defn maybe-default<?T> (x:Maybe<?T>, default:?T) -> T :
+  match(x) :
+    (x:One<T>) : value(x)
+    (_) : default
+
+;Converts a row name (e.g. A, B, C, ... Y, AA, AB, ... YY, AAA ...) into a
+;zero-indexed index number
+val EXCLUDED-ROW-CHARS = ['I', 'O', 'Q', 'S', 'X', 'Z']
+val EXCLUDED-LEN = length(EXCLUDED-ROW-CHARS)
+public defn row-name-to-index (row-name:String) -> Int :
+  defn row-char-to-index (c:Char) -> Int :
+    if c < 'A' or c > 'Z' :
+      throw(Exception("Invalid character in row name: %_" % [c]))
+    val offset = with-default{_, EXCLUDED-LEN} $
+      for e in EXCLUDED-ROW-CHARS index-when :
+        if c == e :
+          throw(Exception("Invalid character in row name: %_" % [c]))
+        c < e
+    to-int(c) - to-int('A') - offset + 1
+  val base = 26 - EXCLUDED-LEN
+  reduce({base * _0 + _1}, 0, seq(row-char-to-index, row-name))

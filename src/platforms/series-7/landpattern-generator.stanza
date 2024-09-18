@@ -1,0 +1,123 @@
+defpackage xilinx/platforms/series-7/landpattern-generator :
+  import core
+  import collections
+
+;============================================================
+;======================== Constants =========================
+;============================================================
+
+val INT-A = to-int('A')
+
+;Characters excluded from row names
+;Must be sorted
+val EXCLUDED-CHARS = ['I', 'O', 'Q', 'S', 'X', 'Z']
+val RADIX = 26 - length(EXCLUDED-CHARS)
+
+val PAD-TMPLT =
+\<s>pcb-pad %_ :
+  type = SMD
+  shape = Circle(%_)
+  layer(SolderMask(Top)) = Circle(%_)<s>
+
+val COURTYARD-TMPLT = "  layer(Courtyard(Top)) = RoundedRectangle(%_, %_, %_)"
+
+val SILKSCREEN-TMPLT = "  layer(Silkscreen(\"pol\", Top)) = loc(%_, %_) * Line(0.1, [Point(0.0, -%_), Point(0.0, 0.0), \
+Point(%_, 0.0)])"
+
+val TMPLT =
+\<s>%_
+
+pcb-landpattern %_ :
+%_
+%_
+
+%*
+<s>
+
+val LP-ROW-TMPLT = "  pad %%_[%%_] : %_ at loc(%%_, %%_)"
+
+;============================================================
+;======================== Generator =========================
+;============================================================
+
+;Generates the landpattern definition for a series 7 FPGA BGA grid
+;Some landpatterns have triangles "cut" from the corners, the width (in pad count) of one side of these triangles is
+;'corner-cut' (0 for no corner cutting)
+public defn generate-landpattern (
+              name:String,
+              rows:Int, cols:Int,
+              width:Double, height:Double,
+              pitch:Double, pad-diameter:Double
+              --
+              corner-cut:Int = 0,
+              corner-radius:Double = 0.2,
+              orientation-marker-thickness:Double = 0.1,
+              orientation-marker-length:Double = 3.0)
+              -> String :
+  val pad-def-name = append(name, "-pad")
+  val pad-radius = 0.5 * pad-diameter
+  val pad-def = to-string $ PAD-TMPLT % [pad-def-name, pad-radius, pad-radius]
+
+  val courtyard = to-string $ COURTYARD-TMPLT % [width, height, corner-radius]
+  val silkscreen = to-string $ SILKSCREEN-TMPLT % [(-0.5 * width), (0.5 * height), orientation-marker-length,
+    orientation-marker-length]
+
+  val half-rows = 0.5 * to-double(rows - 1)
+  val half-cols = 0.5 * to-double(cols - 1)
+  val lp-row-tmplt = to-string $ LP-ROW-TMPLT % [pad-def-name]
+  val lp-rows = Vector<String>()
+  for r in 0 to rows do :
+    for c in 0 to cols do :
+      val r-inv = rows - r - 1
+      val c-inv = cols - c - 1
+      if min(r, r-inv) + min(c, c-inv) >= corner-cut :
+        val row-name = to-row-name(r)
+        val x = (to-double(c) - half-cols) * pitch
+        val y = (to-double(r-inv) - half-rows) * pitch
+        add(lp-rows, to-string $ lp-row-tmplt % [row-name, (c + 1), x, y])
+  to-string $ TMPLT % [pad-def, name, courtyard, silkscreen, join(lp-rows, "\n")]
+
+;============================================================
+;=================== Row Name Generation ====================
+;============================================================
+
+;Converts a row index into its letter-sequence-based equivalent, excluding the
+;characters in EXCLUDED-CHARS
+;E.g.:
+;  0 A
+;  1 B
+;  ...
+; 18 W
+; 19 Y
+; 20 AA
+; 21 AB
+;  ...
+; 38 AW
+; 39 AY
+; 40 BA
+; 41 BB
+;  ...
+;418 YW
+;419 YY
+;420 AAA
+;421 AAA
+;etc.
+;row-index is 0-indexed
+defn to-row-name (row-index:Int) -> String :
+  if row-index < 0 :
+    throw(Exception("Row index is negative: %_" % [row-index]))
+  val chars = Vector<Char>()
+  var i:Int = row-index
+  while i >= 0 :
+    add(chars, to-row-char(i % RADIX))
+    i = (i / RADIX) - 1 ;trust me this works
+  String(in-reverse(chars))
+
+val INDEX-MAGIC = to-tuple(cat(seq({to-int(_1) - INT-A - _0}, 0 to false, EXCLUDED-CHARS), [INT-MAX]))
+;i must be between 0 to [RADIX - 1] inclusive
+defn to-row-char (i:Int) -> Char :
+  if i < 0 :
+    throw(Exception("Row character digit is negative: %_" % [i]))
+  if i >= RADIX :
+    throw(Exception("Row character digit exceeds radix %_: %_" % [RADIX, i]))
+  to-char(INT-A + i + index-when!({i < _}, INDEX-MAGIC))
