@@ -1,0 +1,578 @@
+#use-added-syntax(jitx)
+defpackage components/xczu1cg :
+  import core
+  import collections
+
+  import jitx
+  import jitx/commands
+
+  import jsl/design/settings
+  import jsl/bundles
+  import jsl/bundles/debug
+  import jsl/symbols/box-symbol
+
+  import bundles/ultrascale
+  import landpatterns/sbva484-bga
+
+protected pcb-component component :
+  port PS_JTAG : jtag
+  port PS_DDR_DQS : diff-pair[[0 to 4, 8]]
+  port PS_DDR_CK : diff-pair[[0 to 2]]
+  port PS_MGTREFCLK : ultrascale-ps-gt-clock[[505]]
+  port PS_MGTR : ultrascale-gt-quad[[505]]
+  port IO_HD : ultrascale-hd-io-bank[[44]]
+  port IO_HP : ultrascale-hp-io-bank[[65]]
+  port IO_HP_S : ultrascale-short-hp-io-bank[[66]]
+  pin-properties :
+    [ pin:Ref | pads:Ref ... | bank:(Ref|Int) | xilinx-bank:Int | memory-byte-group:Int ]
+    [ GND[0] | A[1] | (Ref(`GND)) | 0 | - ]
+    [ GND[1] | A[5] | (Ref(`GND)) | 0 | - ]
+    [ GND[2] | A[10] | (Ref(`GND)) | 0 | - ]
+    [ GND[3] | A[15] | (Ref(`GND)) | 0 | - ]
+    [ GND[4] | A[18] | (Ref(`GND)) | 0 | - ]
+    [ GND[5] | A[22] | (Ref(`GND)) | 0 | - ]
+    [ GND[6] | B[13] | (Ref(`GND)) | 0 | - ]
+    [ GND[7] | B[20] | (Ref(`GND)) | 0 | - ]
+    [ GND[8] | C[1] | (Ref(`GND)) | 0 | - ]
+    [ GND[9] | C[6] | (Ref(`GND)) | 0 | - ]
+    [ GND[10] | C[18] | (Ref(`GND)) | 0 | - ]
+    [ GND[11] | C[21] | (Ref(`GND)) | 0 | - ]
+    [ GND[12] | C[22] | (Ref(`GND)) | 0 | - ]
+    [ GND[13] | D[4] | (Ref(`GND)) | 0 | - ]
+    [ GND[14] | D[9] | (Ref(`GND)) | 0 | - ]
+    [ GND[15] | D[20] | (Ref(`GND)) | 0 | - ]
+    [ GND[16] | E[2] | (Ref(`GND)) | 0 | - ]
+    [ GND[17] | E[12] | (Ref(`GND)) | 0 | - ]
+    [ GND[18] | E[17] | (Ref(`GND)) | 0 | - ]
+    [ GND[19] | E[18] | (Ref(`GND)) | 0 | - ]
+    [ GND[20] | E[21] | (Ref(`GND)) | 0 | - ]
+    [ GND[21] | E[22] | (Ref(`GND)) | 0 | - ]
+    [ GND[22] | F[5] | (Ref(`GND)) | 0 | - ]
+    [ GND[23] | F[15] | (Ref(`GND)) | 0 | - ]
+    [ GND[24] | F[20] | (Ref(`GND)) | 0 | - ]
+    [ GND[25] | G[8] | (Ref(`GND)) | 0 | - ]
+    [ GND[26] | G[18] | (Ref(`GND)) | 0 | - ]
+    [ GND[27] | G[21] | (Ref(`GND)) | 0 | - ]
+    [ GND[28] | G[22] | (Ref(`GND)) | 0 | - ]
+    [ GND[29] | H[1] | (Ref(`GND)) | 0 | - ]
+    [ GND[30] | H[6] | (Ref(`GND)) | 0 | - ]
+    [ GND[31] | H[9] | (Ref(`GND)) | 0 | - ]
+    [ GND[32] | H[11] | (Ref(`GND)) | 0 | - ]
+    [ GND[33] | H[20] | (Ref(`GND)) | 0 | - ]
+    [ GND[34] | J[4] | (Ref(`GND)) | 0 | - ]
+    [ GND[35] | J[8] | (Ref(`GND)) | 0 | - ]
+    [ GND[36] | J[10] | (Ref(`GND)) | 0 | - ]
+    [ GND[37] | J[14] | (Ref(`GND)) | 0 | - ]
+    [ GND[38] | J[18] | (Ref(`GND)) | 0 | - ]
+    [ GND[39] | J[21] | (Ref(`GND)) | 0 | - ]
+    [ GND[40] | J[22] | (Ref(`GND)) | 0 | - ]
+    [ GND[41] | K[7] | (Ref(`GND)) | 0 | - ]
+    [ GND[42] | K[11] | (Ref(`GND)) | 0 | - ]
+    [ GND[43] | K[17] | (Ref(`GND)) | 0 | - ]
+    [ GND[44] | K[20] | (Ref(`GND)) | 0 | - ]
+    [ GND[45] | L[5] | (Ref(`GND)) | 0 | - ]
+    [ GND[46] | L[8] | (Ref(`GND)) | 0 | - ]
+    [ GND[47] | L[15] | (Ref(`GND)) | 0 | - ]
+    [ GND[48] | L[18] | (Ref(`GND)) | 0 | - ]
+    [ GND[49] | L[21] | (Ref(`GND)) | 0 | - ]
+    [ GND[50] | L[22] | (Ref(`GND)) | 0 | - ]
+    [ GND[51] | M[3] | (Ref(`GND)) | 0 | - ]
+    [ GND[52] | M[11] | (Ref(`GND)) | 0 | - ]
+    [ GND[53] | M[13] | (Ref(`GND)) | 0 | - ]
+    [ GND[54] | M[18] | (Ref(`GND)) | 0 | - ]
+    [ GND[55] | M[19] | (Ref(`GND)) | 0 | - ]
+    [ GND[56] | N[1] | (Ref(`GND)) | 0 | - ]
+    [ GND[57] | N[6] | (Ref(`GND)) | 0 | - ]
+    [ GND[58] | N[8] | (Ref(`GND)) | 0 | - ]
+    [ GND[59] | N[16] | (Ref(`GND)) | 0 | - ]
+    [ GND[60] | N[20] | (Ref(`GND)) | 0 | - ]
+    [ GND[61] | N[21] | (Ref(`GND)) | 0 | - ]
+    [ GND[62] | N[22] | (Ref(`GND)) | 0 | - ]
+    [ GND[63] | P[7] | (Ref(`GND)) | 0 | - ]
+    [ GND[64] | P[9] | (Ref(`GND)) | 0 | - ]
+    [ GND[65] | P[11] | (Ref(`GND)) | 0 | - ]
+    [ GND[66] | P[14] | (Ref(`GND)) | 0 | - ]
+    [ GND[67] | R[2] | (Ref(`GND)) | 0 | - ]
+    [ GND[68] | R[8] | (Ref(`GND)) | 0 | - ]
+    [ GND[69] | R[10] | (Ref(`GND)) | 0 | - ]
+    [ GND[70] | R[12] | (Ref(`GND)) | 0 | - ]
+    [ GND[71] | R[17] | (Ref(`GND)) | 0 | - ]
+    [ GND[72] | R[22] | (Ref(`GND)) | 0 | - ]
+    [ GND[73] | T[5] | (Ref(`GND)) | 0 | - ]
+    [ GND[74] | T[11] | (Ref(`GND)) | 0 | - ]
+    [ GND[75] | T[15] | (Ref(`GND)) | 0 | - ]
+    [ GND[76] | U[3] | (Ref(`GND)) | 0 | - ]
+    [ GND[77] | U[8] | (Ref(`GND)) | 0 | - ]
+    [ GND[78] | U[13] | (Ref(`GND)) | 0 | - ]
+    [ GND[79] | U[18] | (Ref(`GND)) | 0 | - ]
+    [ GND[80] | V[1] | (Ref(`GND)) | 0 | - ]
+    [ GND[81] | V[11] | (Ref(`GND)) | 0 | - ]
+    [ GND[82] | W[4] | (Ref(`GND)) | 0 | - ]
+    [ GND[83] | W[9] | (Ref(`GND)) | 0 | - ]
+    [ GND[84] | W[14] | (Ref(`GND)) | 0 | - ]
+    [ GND[85] | W[19] | (Ref(`GND)) | 0 | - ]
+    [ GND[86] | Y[2] | (Ref(`GND)) | 0 | - ]
+    [ GND[87] | Y[7] | (Ref(`GND)) | 0 | - ]
+    [ GND[88] | Y[12] | (Ref(`GND)) | 0 | - ]
+    [ GND[89] | AA[10] | (Ref(`GND)) | 0 | - ]
+    [ GND[90] | AA[15] | (Ref(`GND)) | 0 | - ]
+    [ GND[91] | AA[20] | (Ref(`GND)) | 0 | - ]
+    [ GND[92] | AB[1] | (Ref(`GND)) | 0 | - ]
+    [ GND[93] | AB[3] | (Ref(`GND)) | 0 | - ]
+    [ GND[94] | AB[8] | (Ref(`GND)) | 0 | - ]
+    [ GND[95] | AB[13] | (Ref(`GND)) | 0 | - ]
+    [ GND[96] | AB[22] | (Ref(`GND)) | 0 | - ]
+    [ VCCINT | H[8] | 0 | 0 | - ]
+    [ VCCO_PSDDR[504] | P[19] | 504 | 504 | - ]
+    [ VCC_PSINTFP | N[14] | 0 | 0 | - ]
+    [ VCC_PSINTLP | N[12] | 0 | 0 | - ]
+    [ VCCBRAM | N[7] | 0 | 0 | - ]
+    [ VCCINT_IO | H[7] | 0 | 0 | - ]
+    [ VCCO[65] | B[3] | 65 | 65 | - ]
+    [ VCC_PSAUX | L[16] | 0 | 0 | - ]
+    [ PS_MGTRAVCC | F[19] | 0 | 0 | - ]
+    [ PS_MGTRAVTT | A[21] | 0 | 0 | - ]
+    [ VCCAUX_IO | J[6] | 0 | 0 | - ]
+    [ VCC_PSINTFP_DDR | N[17] | 0 | 0 | - ]
+    [ VCC_PSPLL | L[13] | 0 | 0 | - ]
+    [ VCCAUX | M[6] | 0 | 0 | - ]
+    [ VCCO[44] | B[8] | 44 | 44 | - ]
+    [ VCCO_PSIO[0] | V[6] | 500 | 500 | - ]
+    [ VCCO_PSIO[1] | C[11] | 501 | 501 | - ]
+    [ VCCO_PSIO[2] | C[16] | 502 | 502 | - ]
+    [ VCCO_PSIO[3] | G[13] | 503 | 503 | - ]
+    [ VCC_PSDDR_PLL | M[14] | 0 | 0 | - ]
+    [ DXN | N[9] | 0 | 0 | - ]
+    [ DXP | N[10] | 0 | 0 | - ]
+    [ GNDADC | K[9] | 0 | 0 | - ]
+    [ GND_PSADC | P[16] | 0 | 0 | - ]
+    [ POR_OVERRIDE | T[7] | 0 | 0 | - ]
+    [ PS_DDR_A[0] | AA[22] | 0 | 0 | - ]
+    [ PS_DDR_A[1] | AB[20] | 0 | 0 | - ]
+    [ PS_DDR_A[10] | Y[21] | 0 | 0 | - ]
+    [ PS_DDR_A[11] | AA[21] | 0 | 0 | - ]
+    [ PS_DDR_A[12] | AA[18] | 0 | 0 | - ]
+    [ PS_DDR_A[13] | AA[19] | 0 | 0 | - ]
+    [ PS_DDR_A[14] | AA[17] | 0 | 0 | - ]
+    [ PS_DDR_A[15] | AA[16] | 0 | 0 | - ]
+    [ PS_DDR_A[16] | Y[16] | 0 | 0 | - ]
+    [ PS_DDR_A[17] | W[16] | 0 | 0 | - ]
+    [ PS_DDR_A[2] | AB[17] | 0 | 0 | - ]
+    [ PS_DDR_A[3] | AB[19] | 0 | 0 | - ]
+    [ PS_DDR_A[4] | AB[21] | 0 | 0 | - ]
+    [ PS_DDR_A[5] | AB[16] | 0 | 0 | - ]
+    [ PS_DDR_A[6] | Y[20] | 0 | 0 | - ]
+    [ PS_DDR_A[7] | Y[19] | 0 | 0 | - ]
+    [ PS_DDR_A[8] | W[17] | 0 | 0 | - ]
+    [ PS_DDR_A[9] | Y[18] | 0 | 0 | - ]
+    [ PS_DDR_ACT_N | U[15] | 0 | 0 | - ]
+    [ PS_DDR_ALERT_N | T[21] | 0 | 0 | - ]
+    [ PS_DDR_BA[0] | U[17] | 0 | 0 | - ]
+    [ PS_DDR_BA[1] | V[17] | 0 | 0 | - ]
+    [ PS_DDR_BG[0] | U[16] | 0 | 0 | - ]
+    [ PS_DDR_BG[1] | W[18] | 0 | 0 | - ]
+    [ PS_DDR_CK[0].P | V[20] | 0 | 0 | - ]
+    [ PS_DDR_CK[1].P | V[18] | 0 | 0 | - ]
+    [ PS_DDR_CKE0 | U[22] | 0 | 0 | - ]
+    [ PS_DDR_CKE1 | U[21] | 0 | 0 | - ]
+    [ PS_DDR_CK[0].N | W[20] | 0 | 0 | - ]
+    [ PS_DDR_CK[1].N | V[19] | 0 | 0 | - ]
+    [ PS_DDR_CS_N[0] | V[22] | 0 | 0 | - ]
+    [ PS_DDR_CS_N[1] | U[20] | 0 | 0 | - ]
+    [ PS_DDR_DM[0] | AB[9] | 0 | 0 | - ]
+    [ PS_DDR_DM[1] | AB[14] | 0 | 0 | - ]
+    [ PS_DDR_DM[2] | U[9] | 0 | 0 | - ]
+    [ PS_DDR_DM[3] | W[13] | 0 | 0 | - ]
+    [ PS_DDR_DM[8] | R[19] | 0 | 0 | - ]
+    [ PS_DDR_DQ[0] | AB[11] | 0 | 0 | - ]
+    [ PS_DDR_DQ[1] | Y[10] | 0 | 0 | - ]
+    [ PS_DDR_DQ[10] | AA[12] | 0 | 0 | - ]
+    [ PS_DDR_DQ[11] | AB[12] | 0 | 0 | - ]
+    [ PS_DDR_DQ[12] | Y[14] | 0 | 0 | - ]
+    [ PS_DDR_DQ[13] | AA[14] | 0 | 0 | - ]
+    [ PS_DDR_DQ[14] | Y[15] | 0 | 0 | - ]
+    [ PS_DDR_DQ[15] | AB[15] | 0 | 0 | - ]
+    [ PS_DDR_DQ[16] | W[8] | 0 | 0 | - ]
+    [ PS_DDR_DQ[17] | W[7] | 0 | 0 | - ]
+    [ PS_DDR_DQ[18] | V[7] | 0 | 0 | - ]
+    [ PS_DDR_DQ[19] | V[10] | 0 | 0 | - ]
+    [ PS_DDR_DQ[2] | AB[10] | 0 | 0 | - ]
+    [ PS_DDR_DQ[20] | U[7] | 0 | 0 | - ]
+    [ PS_DDR_DQ[21] | T[9] | 0 | 0 | - ]
+    [ PS_DDR_DQ[22] | U[10] | 0 | 0 | - ]
+    [ PS_DDR_DQ[23] | T[10] | 0 | 0 | - ]
+    [ PS_DDR_DQ[24] | U[11] | 0 | 0 | - ]
+    [ PS_DDR_DQ[25] | U[12] | 0 | 0 | - ]
+    [ PS_DDR_DQ[26] | W[12] | 0 | 0 | - ]
+    [ PS_DDR_DQ[27] | W[11] | 0 | 0 | - ]
+    [ PS_DDR_DQ[28] | V[14] | 0 | 0 | - ]
+    [ PS_DDR_DQ[29] | U[14] | 0 | 0 | - ]
+    [ PS_DDR_DQ[3] | W[10] | 0 | 0 | - ]
+    [ PS_DDR_DQ[30] | W[15] | 0 | 0 | - ]
+    [ PS_DDR_DQ[31] | V[15] | 0 | 0 | - ]
+    [ PS_DDR_DQ[4] | AA[8] | 0 | 0 | - ]
+    [ PS_DDR_DQ[5] | Y[8] | 0 | 0 | - ]
+    [ PS_DDR_DQ[6] | AB[7] | 0 | 0 | - ]
+    [ PS_DDR_DQ[64] | T[22] | 0 | 0 | - ]
+    [ PS_DDR_DQ[65] | P[22] | 0 | 0 | - ]
+    [ PS_DDR_DQ[66] | R[21] | 0 | 0 | - ]
+    [ PS_DDR_DQ[67] | P[21] | 0 | 0 | - ]
+    [ PS_DDR_DQ[68] | R[18] | 0 | 0 | - ]
+    [ PS_DDR_DQ[69] | P[18] | 0 | 0 | - ]
+    [ PS_DDR_DQ[7] | AA[7] | 0 | 0 | - ]
+    [ PS_DDR_DQ[70] | N[18] | 0 | 0 | - ]
+    [ PS_DDR_DQ[71] | N[19] | 0 | 0 | - ]
+    [ PS_DDR_DQ[8] | AA[11] | 0 | 0 | - ]
+    [ PS_DDR_DQ[9] | Y[11] | 0 | 0 | - ]
+    [ PS_DDR_DQS[0].N | AA[9] | 0 | 0 | - ]
+    [ PS_DDR_DQS[1].N | AA[13] | 0 | 0 | - ]
+    [ PS_DDR_DQS[2].N | V[8] | 0 | 0 | - ]
+    [ PS_DDR_DQS[3].N | V[13] | 0 | 0 | - ]
+    [ PS_DDR_DQS[8].N | R[20] | 0 | 0 | - ]
+    [ PS_DDR_DQS[0].P | Y[9] | 0 | 0 | - ]
+    [ PS_DDR_DQS[1].P | Y[13] | 0 | 0 | - ]
+    [ PS_DDR_DQS[2].P | V[9] | 0 | 0 | - ]
+    [ PS_DDR_DQS[3].P | V[12] | 0 | 0 | - ]
+    [ PS_DDR_DQS[8].P | P[20] | 0 | 0 | - ]
+    [ PS_DDR_ODT[0] | W[22] | 0 | 0 | - ]
+    [ PS_DDR_ODT[1] | W[21] | 0 | 0 | - ]
+    [ PS_DDR_PARITY | U[19] | 0 | 0 | - ]
+    [ PS_DDR_RAM_RST_N | T[18] | 0 | 0 | - ]
+    [ PS_DDR_ZQ | T[19] | 0 | 0 | - ]
+    [ PS_DONE | L[12] | 0 | 0 | - ]
+    [ PS_ERROR_OUT | K[16] | 0 | 0 | - ]
+    [ PS_ERROR_STATUS | K[18] | 0 | 0 | - ]
+    [ PS_INIT_B | K[15] | 0 | 0 | - ]
+    [ PS_JTAG.tck | H[13] | 0 | 0 | - ]
+    [ PS_JTAG.tdi | H[12] | 0 | 0 | - ]
+    [ PS_JTAG.tdo | J[13] | 0 | 0 | - ]
+    [ PS_JTAG.tms | J[12] | 0 | 0 | - ]
+    [ PS_MGTREFCLK[505].I[0].N | L[20] | 505 | 505 | - ]
+    [ PS_MGTREFCLK[505].I[0].P | L[19] | 505 | 505 | - ]
+    [ PS_MGTREFCLK[505].I[1].N | J[20] | 505 | 505 | - ]
+    [ PS_MGTREFCLK[505].I[1].P | J[19] | 505 | 505 | - ]
+    [ PS_MGTREFCLK[505].I[2].N | G[20] | 505 | 505 | - ]
+    [ PS_MGTREFCLK[505].I[2].P | G[19] | 505 | 505 | - ]
+    [ PS_MGTREFCLK[505].I[3].N | E[20] | 505 | 505 | - ]
+    [ PS_MGTREFCLK[505].I[3].P | E[19] | 505 | 505 | - ]
+    [ PS_MGTRREF_505 | M[20] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[0].RX.N | M[22] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[1].RX.N | H[22] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[2].RX.N | D[22] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[3].RX.N | B[22] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[0].RX.P | M[21] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[1].RX.P | H[21] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[2].RX.P | D[21] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[3].RX.P | B[21] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[0].TX.N | K[22] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[1].TX.N | F[22] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[2].TX.N | C[20] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[3].TX.N | A[20] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[0].TX.P | K[21] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[1].TX.P | F[21] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[2].TX.P | C[19] | 505 | 505 | - ]
+    [ PS_MGTR[505].C[3].TX.P | A[19] | 505 | 505 | - ]
+    [ PS_MIO[0] | U[4] | 0 | 0 | - ]
+    [ PS_MIO[1] | W[1] | 0 | 0 | - ]
+    [ PS_MIO[10] | AA[2] | 0 | 0 | - ]
+    [ PS_MIO[11] | W[2] | 0 | 0 | - ]
+    [ PS_MIO[12] | AB[2] | 0 | 0 | - ]
+    [ PS_MIO[13] | W[3] | 0 | 0 | - ]
+    [ PS_MIO[14] | W[5] | 0 | 0 | - ]
+    [ PS_MIO[15] | Y[4] | 0 | 0 | - ]
+    [ PS_MIO[16] | Y[3] | 0 | 0 | - ]
+    [ PS_MIO[17] | AA[3] | 0 | 0 | - ]
+    [ PS_MIO[18] | Y[5] | 0 | 0 | - ]
+    [ PS_MIO[19] | AA[4] | 0 | 0 | - ]
+    [ PS_MIO[2] | V[2] | 0 | 0 | - ]
+    [ PS_MIO[20] | AB[4] | 0 | 0 | - ]
+    [ PS_MIO[21] | W[6] | 0 | 0 | - ]
+    [ PS_MIO[22] | AA[6] | 0 | 0 | - ]
+    [ PS_MIO[23] | AB[5] | 0 | 0 | - ]
+    [ PS_MIO[24] | AB[6] | 0 | 0 | - ]
+    [ PS_MIO[25] | Y[6] | 0 | 0 | - ]
+    [ PS_MIO[26] | G[9] | 0 | 0 | - ]
+    [ PS_MIO[27] | G[11] | 0 | 0 | - ]
+    [ PS_MIO[28] | G[12] | 0 | 0 | - ]
+    [ PS_MIO[29] | F[9] | 0 | 0 | - ]
+    [ PS_MIO[3] | U[5] | 0 | 0 | - ]
+    [ PS_MIO[30] | G[10] | 0 | 0 | - ]
+    [ PS_MIO[31] | F[11] | 0 | 0 | - ]
+    [ PS_MIO[32] | F[12] | 0 | 0 | - ]
+    [ PS_MIO[33] | E[9] | 0 | 0 | - ]
+    [ PS_MIO[34] | F[13] | 0 | 0 | - ]
+    [ PS_MIO[35] | E[10] | 0 | 0 | - ]
+    [ PS_MIO[36] | D[10] | 0 | 0 | - ]
+    [ PS_MIO[37] | E[11] | 0 | 0 | - ]
+    [ PS_MIO[38] | C[9] | 0 | 0 | - ]
+    [ PS_MIO[39] | C[10] | 0 | 0 | - ]
+    [ PS_MIO[4] | U[6] | 0 | 0 | - ]
+    [ PS_MIO[40] | D[11] | 0 | 0 | - ]
+    [ PS_MIO[41] | B[10] | 0 | 0 | - ]
+    [ PS_MIO[42] | D[12] | 0 | 0 | - ]
+    [ PS_MIO[43] | E[13] | 0 | 0 | - ]
+    [ PS_MIO[44] | B[11] | 0 | 0 | - ]
+    [ PS_MIO[45] | A[11] | 0 | 0 | - ]
+    [ PS_MIO[46] | C[12] | 0 | 0 | - ]
+    [ PS_MIO[47] | B[12] | 0 | 0 | - ]
+    [ PS_MIO[48] | A[12] | 0 | 0 | - ]
+    [ PS_MIO[49] | D[13] | 0 | 0 | - ]
+    [ PS_MIO[5] | AA[1] | 0 | 0 | - ]
+    [ PS_MIO[50] | A[13] | 0 | 0 | - ]
+    [ PS_MIO[51] | C[13] | 0 | 0 | - ]
+    [ PS_MIO[52] | G[14] | 0 | 0 | - ]
+    [ PS_MIO[53] | F[14] | 0 | 0 | - ]
+    [ PS_MIO[54] | G[15] | 0 | 0 | - ]
+    [ PS_MIO[55] | C[14] | 0 | 0 | - ]
+    [ PS_MIO[56] | E[14] | 0 | 0 | - ]
+    [ PS_MIO[57] | B[14] | 0 | 0 | - ]
+    [ PS_MIO[58] | A[14] | 0 | 0 | - ]
+    [ PS_MIO[59] | E[15] | 0 | 0 | - ]
+    [ PS_MIO[6] | Y[1] | 0 | 0 | - ]
+    [ PS_MIO[60] | D[15] | 0 | 0 | - ]
+    [ PS_MIO[61] | G[16] | 0 | 0 | - ]
+    [ PS_MIO[62] | C[15] | 0 | 0 | - ]
+    [ PS_MIO[63] | F[16] | 0 | 0 | - ]
+    [ PS_MIO[64] | E[16] | 0 | 0 | - ]
+    [ PS_MIO[65] | B[15] | 0 | 0 | - ]
+    [ PS_MIO[66] | D[16] | 0 | 0 | - ]
+    [ PS_MIO[67] | G[17] | 0 | 0 | - ]
+    [ PS_MIO[68] | B[16] | 0 | 0 | - ]
+    [ PS_MIO[69] | A[16] | 0 | 0 | - ]
+    [ PS_MIO[7] | V[4] | 0 | 0 | - ]
+    [ PS_MIO[70] | A[17] | 0 | 0 | - ]
+    [ PS_MIO[71] | F[17] | 0 | 0 | - ]
+    [ PS_MIO[72] | C[17] | 0 | 0 | - ]
+    [ PS_MIO[73] | D[17] | 0 | 0 | - ]
+    [ PS_MIO[74] | D[18] | 0 | 0 | - ]
+    [ PS_MIO[75] | B[17] | 0 | 0 | - ]
+    [ PS_MIO[76] | F[18] | 0 | 0 | - ]
+    [ PS_MIO[77] | B[18] | 0 | 0 | - ]
+    [ PS_MIO[8] | V[3] | 0 | 0 | - ]
+    [ PS_MIO[9] | V[5] | 0 | 0 | - ]
+    [ PS_MODE0 | J[16] | 0 | 0 | - ]
+    [ PS_MODE1 | H[15] | 0 | 0 | - ]
+    [ PS_MODE2 | J[15] | 0 | 0 | - ]
+    [ PS_MODE3 | H[18] | 0 | 0 | - ]
+    [ PS_PADI | H[17] | 0 | 0 | - ]
+    [ PS_PADO | J[17] | 0 | 0 | - ]
+    [ PS_POR_B | K[12] | 0 | 0 | - ]
+    [ PS_PROG_B | K[14] | 0 | 0 | - ]
+    [ PS_REF_CLK | H[14] | 0 | 0 | - ]
+    [ PS_SRST_B | K[13] | 0 | 0 | - ]
+    [ PUDC_B | T[8] | 0 | 0 | - ]
+    [ VCCADC | K[10] | 0 | 0 | - ]
+    [ VCC_PSADC | P[15] | 0 | 0 | - ]
+    [ VCC_PSBATT | N[15] | 0 | 0 | - ]
+    [ VN | M[9] | 0 | 0 | - ]
+    [ VP | L[10] | 0 | 0 | - ]
+    [ VREFN | L[9] | 0 | 0 | - ]
+    [ VREFP | M[10] | 0 | 0 | - ]
+    [ VREF[65] | K[5] | 65 | 65 | - ]
+    [ VREF[66] | C[4] | 66 | 66 | - ]
+    [ IO_HD[44].L[12].N | A[6] | 44 | 44 | - ]
+    [ IO_HD[44].L[12].P | B[7] | 44 | 44 | - ]
+    [ IO_HD[44].L[11].N | B[5] | 44 | 44 | - ]
+    [ IO_HD[44].L[11].P | B[6] | 44 | 44 | - ]
+    [ IO_HD[44].L[10].N | A[7] | 44 | 44 | - ]
+    [ IO_HD[44].L[10].P | A[8] | 44 | 44 | - ]
+    [ IO_HD[44].L[9].N | A[9] | 44 | 44 | - ]
+    [ IO_HD[44].L[9].P | B[9] | 44 | 44 | - ]
+    [ IO_HD[44].L[8].N | C[7] | 44 | 44 | - ]
+    [ IO_HD[44].L[8].P | C[8] | 44 | 44 | - ]
+    [ IO_HD[44].L[7].N | C[5] | 44 | 44 | - ]
+    [ IO_HD[44].L[7].P | D[5] | 44 | 44 | - ]
+    [ IO_HD[44].L[6].N | D[8] | 44 | 44 | - ]
+    [ IO_HD[44].L[6].P | E[8] | 44 | 44 | - ]
+    [ IO_HD[44].L[5].N | D[6] | 44 | 44 | - ]
+    [ IO_HD[44].L[5].P | D[7] | 44 | 44 | - ]
+    [ IO_HD[44].L[4].N | F[7] | 44 | 44 | - ]
+    [ IO_HD[44].L[4].P | F[8] | 44 | 44 | - ]
+    [ IO_HD[44].L[3].N | E[5] | 44 | 44 | - ]
+    [ IO_HD[44].L[3].P | E[6] | 44 | 44 | - ]
+    [ IO_HD[44].L[2].N | F[6] | 44 | 44 | - ]
+    [ IO_HD[44].L[2].P | G[7] | 44 | 44 | - ]
+    [ IO_HD[44].L[1].N | G[5] | 44 | 44 | - ]
+    [ IO_HD[44].L[1].P | G[6] | 44 | 44 | - ]
+    [ IO_HP[65].T[3].L[5].N | C[2] | 65 | 65 | - ]
+    [ IO_HP[65].T[3].L[5].P | D[2] | 65 | 65 | - ]
+    [ IO_HP[65].T[3].L[4].N | F[2] | 65 | 65 | - ]
+    [ IO_HP[65].T[3].L[4].P | F[3] | 65 | 65 | - ]
+    [ IO_HP[65].T[3].L[3].N | C[3] | 65 | 65 | - ]
+    [ IO_HP[65].T[3].L[3].P | D[3] | 65 | 65 | - ]
+    [ IO_HP[65].T[3].L[2].N | D[1] | 65 | 65 | - ]
+    [ IO_HP[65].T[3].L[2].P | E[1] | 65 | 65 | - ]
+    [ IO_HP[65].T[3].L[1].N | E[3] | 65 | 65 | - ]
+    [ IO_HP[65].T[3].L[1].P | E[4] | 65 | 65 | - ]
+    [ IO_HP[65].T[3].L[0].N | F[1] | 65 | 65 | - ]
+    [ IO_HP[65].T[3].L[0].P | G[1] | 65 | 65 | - ]
+    [ IO_HP[65].T[3].S | F[4] | 65 | 65 | - ]
+    [ IO_HP[65].T[2].S | H[3] | 65 | 65 | - ]
+    [ IO_HP[65].T[2].L[5].N | G[4] | 65 | 65 | - ]
+    [ IO_HP[65].T[2].L[5].P | H[4] | 65 | 65 | - ]
+    [ IO_HP[65].T[2].L[4].N | G[2] | 65 | 65 | - ]
+    [ IO_HP[65].T[2].L[4].P | H[2] | 65 | 65 | - ]
+    [ IO_HP[65].T[2].L[3].N | H[5] | 65 | 65 | - ]
+    [ IO_HP[65].T[2].L[3].P | J[5] | 65 | 65 | - ]
+    [ IO_HP[65].T[2].L[2].N | J[1] | 65 | 65 | - ]
+    [ IO_HP[65].T[2].L[2].P | K[1] | 65 | 65 | - ]
+    [ IO_HP[65].T[2].L[1].N | K[3] | 65 | 65 | - ]
+    [ IO_HP[65].T[2].L[1].P | K[4] | 65 | 65 | - ]
+    [ IO_HP[65].T[2].L[0].N | J[2] | 65 | 65 | - ]
+    [ IO_HP[65].T[2].L[0].P | J[3] | 65 | 65 | - ]
+    [ IO_HP[65].T[1].L[5].N | L[3] | 65 | 65 | - ]
+    [ IO_HP[65].T[1].L[5].P | L[4] | 65 | 65 | - ]
+    [ IO_HP[65].T[1].L[4].N | L[1] | 65 | 65 | - ]
+    [ IO_HP[65].T[1].L[4].P | L[2] | 65 | 65 | - ]
+    [ IO_HP[65].T[1].L[3].N | M[4] | 65 | 65 | - ]
+    [ IO_HP[65].T[1].L[3].P | M[5] | 65 | 65 | - ]
+    [ IO_HP[65].T[1].L[2].N | M[1] | 65 | 65 | - ]
+    [ IO_HP[65].T[1].L[2].P | M[2] | 65 | 65 | - ]
+    [ IO_HP[65].T[1].L[1].N | N[4] | 65 | 65 | - ]
+    [ IO_HP[65].T[1].L[1].P | N[5] | 65 | 65 | - ]
+    [ IO_HP[65].T[1].L[0].N | P[1] | 65 | 65 | - ]
+    [ IO_HP[65].T[1].L[0].P | N[2] | 65 | 65 | - ]
+    [ IO_HP[65].T[1].S | N[3] | 65 | 65 | - ]
+    [ IO_HP[65].T[0].S | P[2] | 65 | 65 | - ]
+    [ IO_HP[65].T[0].L[5].N | R[5] | 65 | 65 | - ]
+    [ IO_HP[65].T[0].L[5].P | P[5] | 65 | 65 | - ]
+    [ IO_HP[65].T[0].L[4].N | T[1] | 65 | 65 | - ]
+    [ IO_HP[65].T[0].L[4].P | R[1] | 65 | 65 | - ]
+    [ IO_HP[65].T[0].L[3].N | T[4] | 65 | 65 | - ]
+    [ IO_HP[65].T[0].L[3].P | R[4] | 65 | 65 | - ]
+    [ IO_HP[65].T[0].L[2].N | U[1] | 65 | 65 | - ]
+    [ IO_HP[65].T[0].L[2].P | U[2] | 65 | 65 | - ]
+    [ IO_HP[65].T[0].L[1].N | R[3] | 65 | 65 | - ]
+    [ IO_HP[65].T[0].L[1].P | P[3] | 65 | 65 | - ]
+    [ IO_HP[65].T[0].L[0].N | T[2] | 65 | 65 | - ]
+    [ IO_HP[65].T[0].L[0].P | T[3] | 65 | 65 | - ]
+    [ IO_HP_S[66].T[3].S | A[2] | 66 | 66 | - ]
+    [ IO_HP_S[66].T[1].L[5].N | A[3] | 66 | 66 | - ]
+    [ IO_HP_S[66].T[1].L[5].P | A[4] | 66 | 66 | - ]
+    [ IO_HP_S[66].T[1].L[4].N | B[1] | 66 | 66 | - ]
+    [ IO_HP_S[66].T[1].L[4].P | B[2] | 66 | 66 | - ]
+    [ IO_HP_S[66].T[0].S | B[4] | 66 | 66 | - ]
+  val box = BoxSymbol(self)
+  val unique-sym-banks = to-tuple $ unique $ for p in pins(self) seq :
+    property(p.bank)
+  property(self.bank-mappings) = to-tuple $ for (i in 0 to false, sym in unique-sym-banks) seq :
+    sym => i
+  assign-symbols(seq({_ => box}, unique-sym-banks))
+  assign-landpattern(sbva484-bga)
+
+protected pcb-module module :
+  port GND : pin
+
+  inst comp : component
+  val bank-mappings = property(comp.bank-mappings)
+  for bank-mapping in bank-mappings do :
+    schematic-group(comp, value(bank-mapping)) = (
+      match(key(bank-mapping)) :
+        (r:Ref) : r
+        (i:Int) : IndexRef(Ref(`bank), i))
+
+  for p in pins(comp.GND) do :
+    net (GND p)
+
+  make-supports(comp)
+
+defn make-supports (comp:Instance) :
+  make-clock-supports(comp)
+  make-dci-vref-supports(comp)
+  make-byte-clock-supports(comp)
+  make-pci-reset-supports(comp)
+  make-adc-supports(comp)
+  make-i2c-supports(comp)
+  make-pmbus-alert-supports(comp)
+
+defn make-clock-supports (comp:Instance) :
+  inside pcb-module :
+    for i in 5 through 8 do :
+      supports ultrascale-high-density-global-clock :
+        ultrascale-high-density-global-clock.N => comp.IO_HD[44].L[i].N
+        ultrascale-high-density-global-clock.P => comp.IO_HD[44].L[i].P
+    supports ultrascale-global-clock :
+      ultrascale-global-clock.N => comp.IO_HP[65].T[1].L[4].N
+      ultrascale-global-clock.P => comp.IO_HP[65].T[1].L[4].P
+    supports ultrascale-global-clock :
+      ultrascale-global-clock.N => comp.IO_HP[65].T[1].L[5].N
+      ultrascale-global-clock.P => comp.IO_HP[65].T[1].L[5].P
+    supports ultrascale-global-clock :
+      ultrascale-global-clock.N => comp.IO_HP[65].T[2].L[0].N
+      ultrascale-global-clock.P => comp.IO_HP[65].T[2].L[0].P
+    supports ultrascale-global-clock :
+      ultrascale-global-clock.N => comp.IO_HP[65].T[2].L[1].N
+      ultrascale-global-clock.P => comp.IO_HP[65].T[2].L[1].P
+    supports ultrascale-global-clock :
+      ultrascale-global-clock.N => comp.IO_HP_S[66].T[1].L[4].N
+      ultrascale-global-clock.P => comp.IO_HP_S[66].T[1].L[4].P
+    supports ultrascale-global-clock :
+      ultrascale-global-clock.N => comp.IO_HP_S[66].T[1].L[5].N
+      ultrascale-global-clock.P => comp.IO_HP_S[66].T[1].L[5].P
+
+defn make-dci-vref-supports (comp:Instance) :
+  inside pcb-module :
+    supports ultrascale-dci-vref :
+      ultrascale-dci-vref.p => comp.IO_HP_S[66].T[0].S
+    supports ultrascale-dci-vref :
+      ultrascale-dci-vref.p => comp.IO_HP[65].T[0].S
+
+defn make-byte-clock-supports (comp:Instance) :
+  inside pcb-module :
+    supports ultrascale-dedicated-byte-clock :
+      ultrascale-dedicated-byte-clock.N => comp.IO_HP[65].T[0].L[0].N
+      ultrascale-dedicated-byte-clock.P => comp.IO_HP[65].T[0].L[0].P
+    supports ultrascale-dedicated-byte-clock :
+      ultrascale-dedicated-byte-clock.N => comp.IO_HP[65].T[0].L[3].N
+      ultrascale-dedicated-byte-clock.P => comp.IO_HP[65].T[0].L[3].P
+    supports ultrascale-dedicated-byte-clock :
+      ultrascale-dedicated-byte-clock.N => comp.IO_HP[65].T[3].L[0].N
+      ultrascale-dedicated-byte-clock.P => comp.IO_HP[65].T[3].L[0].P
+    supports ultrascale-dedicated-byte-clock :
+      ultrascale-dedicated-byte-clock.N => comp.IO_HP[65].T[3].L[3].N
+      ultrascale-dedicated-byte-clock.P => comp.IO_HP[65].T[3].L[3].P
+    supports ultrascale-quad-byte-clock :
+      ultrascale-quad-byte-clock.N => comp.IO_HP[65].T[1].L[0].N
+      ultrascale-quad-byte-clock.P => comp.IO_HP[65].T[1].L[0].P
+    supports ultrascale-quad-byte-clock :
+      ultrascale-quad-byte-clock.N => comp.IO_HP[65].T[1].L[3].N
+      ultrascale-quad-byte-clock.P => comp.IO_HP[65].T[1].L[3].P
+    supports ultrascale-quad-byte-clock :
+      ultrascale-quad-byte-clock.N => comp.IO_HP[65].T[2].L[0].N
+      ultrascale-quad-byte-clock.P => comp.IO_HP[65].T[2].L[0].P
+    supports ultrascale-quad-byte-clock :
+      ultrascale-quad-byte-clock.N => comp.IO_HP[65].T[2].L[3].N
+      ultrascale-quad-byte-clock.P => comp.IO_HP[65].T[2].L[3].P
+
+defn make-pci-reset-supports (comp:Instance) :
+  inside pcb-module :
+    supports ultrascale-pci-reset :
+      ultrascale-pci-reset.N => comp.IO_HP[65].T[3].L[5].N
+      ultrascale-pci-reset.P => comp.IO_HP[65].T[3].L[5].P
+
+defn make-adc-supports (comp:Instance) :
+  inside pcb-module :
+    for kv in [65 => [[0 2] [0 3] [0 4] [0 5] [1 0] [1 1] [1 2] [1 3] [2 2] [2 3] [2 4] [2 5] [3 0] [3 1] [3 2] [3 3]]] do :
+      val bank = key(kv)
+      for gc in value(kv) do :
+        val [group, channel] = gc
+        supports adc-pair :
+          adc-pair.adc-pair.N => comp.IO_HP[bank].T[group].L[channel].N
+          adc-pair.adc-pair.P => comp.IO_HP[bank].T[group].L[channel].P
+    for kv in [44 => [1 2 3 4 5 6 7 8 9 10 11 12]] do :
+      val bank = key(kv)
+      for channel in value(kv) do :
+        supports adc-pair :
+          adc-pair.adc-pair.N => comp.IO_HD[bank].L[channel].N
+          adc-pair.adc-pair.P => comp.IO_HD[bank].L[channel].P
+
+defn make-i2c-supports (comp:Instance) :
+  inside pcb-module :
+    supports i2c :
+      i2c.sda => comp.IO_HP[65].T[3].L[5].P
+      i2c.scl => comp.IO_HP[65].T[3].L[4].P
+
+defn make-pmbus-alert-supports (comp:Instance) :
+  inside pcb-module :
+    supports ultrascale-pmbus-alert :
+      ultrascale-pmbus-alert.p => comp.IO_HP[65].T[0].L[3].P

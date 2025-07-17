@@ -8,6 +8,7 @@ packages xilinx/tests/* defined-in "tests/"
 
 packages landpatterns/* defined-in "landpatterns/"
 packages bundles/* defined-in "bundles/"
+packages components/* defined-in "components/"
 
 build-test tests:
   inputs: xilinx/tests/pinouts

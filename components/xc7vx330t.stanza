@@ -1,0 +1,1563 @@
+#use-added-syntax(jitx)
+defpackage components/xc7vx330t :
+  import core
+  import collections
+  import jitx
+  import jitx/commands
+  import jsl/design/settings
+  import jsl/bundles
+  import jsl/bundles/debug
+  import jsl/symbols/box-symbol
+  import landpatterns/ffg1157-bga
+
+pcb-bundle virtex-7-io-bank :
+  port S : pin[[0 25]]
+  port D : diff-pair[[1 through 24]]
+
+pcb-bundle virtex-7-gt-quad :
+  port C : lane-pair[4]
+
+pcb-bundle virtex-7-gt-clock :
+  port I : diff-pair[2]
+
+pcb-bundle virtex-7-diff-gpio :
+  port D : diff-pair
+
+pcb-bundle virtex-7-adc :
+  port ADC : diff-pair
+
+;8, 16, or 32 bit width
+pcb-bundle virtex-7-config-data-bus (data-width:Int) :
+  port D : pin[data-width]
+
+pcb-bundle virtex-7-serial-config-data :
+  pin DOUT ; data out
+  pin DIN  ; data in
+
+pcb-bundle virtex-7-spi :
+  pin DOUT ; data out
+  pin FCS  ; chip select
+  pin MOSI ; master-out slave-in
+  pin DIN  ; data in
+
+pcb-bundle virtex-7-select-map-control :
+  pin CSI  ; chip select in
+  pin CSO  ; chip select out
+  pin RDWR ; read/write direction
+
+pcb-bundle virtex-7-bpi-control :
+  pin ADV ; address output valid
+  pin FCS ; chip select
+  pin FOE ; output enable
+  pin FWE ; write enable
+
+pcb-bundle virtex-7-bpi-address :
+  port ADDR : pin[29]
+
+pcb-bundle virtex-7-pull-up-during-config :
+  pin PUDC
+
+pcb-bundle virtex-7-external-master-clock :
+  pin EMCCLK
+
+pcb-bundle virtex-7-revision-select :
+  port RS : pin[2]
+
+pcb-bundle virtex-7-vref :
+  pin VREF
+
+pcb-bundle virtex-7-memory-strobe :
+  port DQS : diff-pair
+
+pcb-bundle virtex-7-memory-byte-pin :
+  pin MBP
+
+public pcb-bundle virtex-7-memory-byte-group :
+  port DQS : diff-pair
+  port P : pin[8]
+
+pcb-bundle virtex-7-memory-byte-group-with-vref :
+  port G : virtex-7-memory-byte-group
+  pin VREF
+
+pcb-bundle virtex-7-single-region-clock :
+  pin SRCC
+
+pcb-bundle virtex-7-multi-region-clock :
+  pin MRCC
+
+pcb-bundle virtex-7-dci-vref-n :
+  pin VRN
+
+pcb-bundle virtex-7-dci-vref-p :
+  pin VRP
+
+public pcb-component component :
+  port VCCBRAM: pin[[0 to 6]]
+  port MGTAVCC_G11: pin[[0 to 5]]
+  port MGTAVCC_G10: pin[[0 to 9]]
+  port MGTAVTT_G11: pin[[0 to 6]]
+  port MGTAVTT_G10: pin[[0 to 10]]
+  port GND: pin[[0 to 251]]
+  port VCCINT: pin[[0 to 43]]
+  port VCCAUX: pin[[0 to 8]]
+  port VCCAUX_IO_G0: pin[[0 to 3]]
+  port VCCAUX_IO_G1: pin[[0 to 3]]
+  port VCCAUX_IO_G2: pin[[0 to 3]]
+  port VCCAUX_IO_G3: pin[[0 to 3]]
+  port VCCO: pin[[0 to 2]]
+  port VCCO_14: pin[[0 to 6]]
+  port VCCO_15: pin[[0 to 7]]
+  port VCCO_16: pin[[0 to 6]]
+  port VCCO_17: pin[[0 to 6]]
+  port VCCO_18: pin[[0 to 7]]
+  port VCCO_19: pin[[0 to 7]]
+  port VCCO_34: pin[[0 to 7]]
+  port VCCO_35: pin[[0 to 6]]
+  port VCCO_36: pin[[0 to 6]]
+  port VCCO_37: pin[[0 to 7]]
+  port VCCO_38: pin[[0 to 6]]
+  port VCCO_39: pin[[0 to 6]]
+  port NC: pin[[0 to 2]]
+  port M: pin[[0 to 3]]
+  port JTAG: jtag
+  port MGTREFCLK: virtex-7-gt-clock[[114 to 119]]
+  port MGTAVTTRCAL: pin[[115]]
+  port MGTH: virtex-7-gt-quad[[114 to 119]]
+  port IO: virtex-7-io-bank[[14 to 20, 34 to 40]]
+  pin-properties :
+    [ pin:Ref | pads:Ref ... | bank:Int | symbol-bank:Ref | memory-byte-group:Int ]
+    [ DXN | W[16] | 0 | (Ref(`0)) | - ]
+    [ VCCADC | T[17] | 0 | (Ref(`0)) | - ]
+    [ GNDADC | T[16] | 0 | (Ref(`0)) | - ]
+    [ DXP | W[17] | 0 | (Ref(`0)) | - ]
+    [ VREFN | V[16] | 0 | (Ref(`0)) | - ]
+    [ VREFP | V[17] | 0 | (Ref(`0)) | - ]
+    [ VP | U[17] | 0 | (Ref(`0)) | - ]
+    [ VN | U[16] | 0 | (Ref(`0)) | - ]
+    [ VCCBATT | P[9] | 0 | (Ref(`0)) | - ]
+    [ CCLK | T[9] | 0 | (Ref(`0)) | - ]
+    [ JTAG.tck | M[8] | 0 | (Ref(`0)) | - ]
+    [ JTAG.tms | N[9] | 0 | (Ref(`0)) | - ]
+    [ JTAG.tdo | N[8] | 0 | (Ref(`0)) | - ]
+    [ JTAG.tdi | L[8] | 0 | (Ref(`0)) | - ]
+    [ INIT_B | T[8] | 0 | (Ref(`0)) | - ]
+    [ PROGRAM_B | U[8] | 0 | (Ref(`0)) | - ]
+    [ CFGBVS | V[9] | 0 | (Ref(`0)) | - ]
+    [ DONE | V[8] | 0 | (Ref(`0)) | - ]
+    [ M[2] | Y[8] | 0 | (Ref(`0)) | - ]
+    [ M[0] | AC[8] | 0 | (Ref(`0)) | - ]
+    [ M[1] | AB[8] | 0 | (Ref(`0)) | - ]
+    [ MGTH[114].C[3].TX.P | AK[2] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[3].RX.P | AJ[4] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[3].TX.N | AK[1] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[3].RX.N | AJ[3] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[2].TX.P | AM[2] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[2].RX.P | AL[4] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[2].TX.N | AM[1] | 114 | (Ref(`114)) | - ]
+    [ MGTREFCLK[114].I[0].P | AH[6] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[2].RX.N | AL[3] | 114 | (Ref(`114)) | - ]
+    [ MGTREFCLK[114].I[0].N | AH[5] | 114 | (Ref(`114)) | - ]
+    [ MGTREFCLK[114].I[1].N | AK[5] | 114 | (Ref(`114)) | - ]
+    [ MGTREFCLK[114].I[1].P | AK[6] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[1].TX.P | AN[4] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[1].RX.P | AM[6] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[1].TX.N | AN[3] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[1].RX.N | AM[5] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[0].TX.P | AP[2] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[0].RX.P | AP[6] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[0].TX.N | AP[1] | 114 | (Ref(`114)) | - ]
+    [ MGTH[114].C[0].RX.N | AP[5] | 114 | (Ref(`114)) | - ]
+    [ MGTH[115].C[3].TX.P | AB[2] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[3].RX.P | AC[4] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[3].TX.N | AB[1] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[3].RX.N | AC[3] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[2].TX.P | AD[2] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[2].RX.P | AE[4] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[2].TX.N | AD[1] | 115 | (Ref(`115)) | - ]
+    [ MGTREFCLK[115].I[0].P | AB[6] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[2].RX.N | AE[3] | 115 | (Ref(`115)) | - ]
+    [ MGTAVTTRCAL[115] | AP[7] | 115 | (Ref(`115)) | - ]
+    [ MGTREFCLK[115].I[0].N | AB[5] | 115 | (Ref(`115)) | - ]
+    [ MGTRREF[115] | AN[7] | 115 | (Ref(`115)) | - ]
+    [ MGTREFCLK[115].I[1].N | AD[5] | 115 | (Ref(`115)) | - ]
+    [ MGTREFCLK[115].I[1].P | AD[6] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[1].TX.P | AF[2] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[1].RX.P | AF[6] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[1].TX.N | AF[1] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[1].RX.N | AF[5] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[0].TX.P | AH[2] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[0].RX.P | AG[4] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[0].TX.N | AH[1] | 115 | (Ref(`115)) | - ]
+    [ MGTH[115].C[0].RX.N | AG[3] | 115 | (Ref(`115)) | - ]
+    [ MGTH[116].C[3].TX.P | P[2] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[3].RX.P | R[4] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[3].TX.N | P[1] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[3].RX.N | R[3] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[2].TX.P | T[2] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[2].RX.P | U[4] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[2].TX.N | T[1] | 116 | (Ref(`116)) | - ]
+    [ MGTREFCLK[116].I[0].P | T[6] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[2].RX.N | U[3] | 116 | (Ref(`116)) | - ]
+    [ MGTREFCLK[116].I[0].N | T[5] | 116 | (Ref(`116)) | - ]
+    [ MGTREFCLK[116].I[1].N | V[5] | 116 | (Ref(`116)) | - ]
+    [ MGTREFCLK[116].I[1].P | V[6] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[1].TX.P | V[2] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[1].RX.P | W[4] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[1].TX.N | V[1] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[1].RX.N | W[3] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[0].TX.P | Y[2] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[0].RX.P | AA[4] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[0].TX.N | Y[1] | 116 | (Ref(`116)) | - ]
+    [ MGTH[116].C[0].RX.N | AA[3] | 116 | (Ref(`116)) | - ]
+    [ MGTH[117].C[3].TX.P | F[2] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[3].RX.P | J[4] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[3].TX.N | F[1] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[3].RX.N | J[3] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[2].TX.P | H[2] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[2].RX.P | K[6] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[2].TX.N | H[1] | 117 | (Ref(`117)) | - ]
+    [ MGTREFCLK[117].I[0].P | M[6] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[2].RX.N | K[5] | 117 | (Ref(`117)) | - ]
+    [ MGTREFCLK[117].I[0].N | M[5] | 117 | (Ref(`117)) | - ]
+    [ MGTREFCLK[117].I[1].N | P[5] | 117 | (Ref(`117)) | - ]
+    [ MGTREFCLK[117].I[1].P | P[6] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[1].TX.P | K[2] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[1].RX.P | L[4] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[1].TX.N | K[1] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[1].RX.N | L[3] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[0].TX.P | M[2] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[0].RX.P | N[4] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[0].TX.N | M[1] | 117 | (Ref(`117)) | - ]
+    [ MGTH[117].C[0].RX.N | N[3] | 117 | (Ref(`117)) | - ]
+    [ MGTH[118].C[3].TX.P | A[4] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[3].RX.P | B[6] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[3].TX.N | A[3] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[3].RX.N | B[5] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[2].TX.P | B[2] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[2].RX.P | D[6] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[2].TX.N | B[1] | 118 | (Ref(`118)) | - ]
+    [ MGTREFCLK[118].I[0].P | F[6] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[2].RX.N | D[5] | 118 | (Ref(`118)) | - ]
+    [ MGTREFCLK[118].I[0].N | F[5] | 118 | (Ref(`118)) | - ]
+    [ MGTREFCLK[118].I[1].N | H[5] | 118 | (Ref(`118)) | - ]
+    [ MGTREFCLK[118].I[1].P | H[6] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[1].TX.P | C[4] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[1].RX.P | E[4] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[1].TX.N | C[3] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[1].RX.N | E[3] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[0].TX.P | D[2] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[0].RX.P | G[4] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[0].TX.N | D[1] | 118 | (Ref(`118)) | - ]
+    [ MGTH[118].C[0].RX.N | G[3] | 118 | (Ref(`118)) | - ]
+    [ VCCBRAM[0] | N[18] | 0 | (Ref(`VCCBRAM)) | - ]
+    [ VCCBRAM[1] | R[18] | 0 | (Ref(`VCCBRAM)) | - ]
+    [ VCCBRAM[2] | U[18] | 0 | (Ref(`VCCBRAM)) | - ]
+    [ VCCBRAM[3] | W[18] | 0 | (Ref(`VCCBRAM)) | - ]
+    [ VCCBRAM[4] | AA[18] | 0 | (Ref(`VCCBRAM)) | - ]
+    [ VCCBRAM[5] | AB[17] | 0 | (Ref(`VCCBRAM)) | - ]
+    [ MGTAVCC_G11[0] | C[6] | 0 | (Ref(`MGTAVCC_G11)) | - ]
+    [ MGTAVCC_G11[1] | E[6] | 0 | (Ref(`MGTAVCC_G11)) | - ]
+    [ MGTAVCC_G11[2] | G[6] | 0 | (Ref(`MGTAVCC_G11)) | - ]
+    [ MGTAVCC_G11[3] | J[6] | 0 | (Ref(`MGTAVCC_G11)) | - ]
+    [ MGTAVCC_G11[4] | L[6] | 0 | (Ref(`MGTAVCC_G11)) | - ]
+    [ MGTAVCC_G10[0] | U[6] | 0 | (Ref(`MGTAVCC_G10)) | - ]
+    [ MGTAVCC_G10[1] | W[6] | 0 | (Ref(`MGTAVCC_G10)) | - ]
+    [ MGTAVCC_G10[2] | AA[6] | 0 | (Ref(`MGTAVCC_G10)) | - ]
+    [ MGTAVCC_G10[3] | AC[6] | 0 | (Ref(`MGTAVCC_G10)) | - ]
+    [ MGTAVCC_G10[4] | AE[6] | 0 | (Ref(`MGTAVCC_G10)) | - ]
+    [ MGTAVCC_G10[5] | AG[6] | 0 | (Ref(`MGTAVCC_G10)) | - ]
+    [ MGTAVCC_G10[6] | AJ[6] | 0 | (Ref(`MGTAVCC_G10)) | - ]
+    [ MGTAVCC_G10[7] | AL[6] | 0 | (Ref(`MGTAVCC_G10)) | - ]
+    [ MGTAVCC_G10[8] | AN[6] | 0 | (Ref(`MGTAVCC_G10)) | - ]
+    [ MGTAVTT_G11[0] | C[2] | 0 | (Ref(`MGTAVTT_G11)) | - ]
+    [ MGTAVTT_G11[1] | D[3] | 0 | (Ref(`MGTAVTT_G11)) | - ]
+    [ MGTAVTT_G11[2] | G[2] | 0 | (Ref(`MGTAVTT_G11)) | - ]
+    [ MGTAVTT_G11[3] | H[3] | 0 | (Ref(`MGTAVTT_G11)) | - ]
+    [ MGTAVTT_G11[4] | L[2] | 0 | (Ref(`MGTAVTT_G11)) | - ]
+    [ MGTAVTT_G11[5] | M[3] | 0 | (Ref(`MGTAVTT_G11)) | - ]
+    [ MGTAVTT_G10[0] | R[2] | 0 | (Ref(`MGTAVTT_G10)) | - ]
+    [ MGTAVTT_G10[1] | T[3] | 0 | (Ref(`MGTAVTT_G10)) | - ]
+    [ MGTAVTT_G10[2] | W[2] | 0 | (Ref(`MGTAVTT_G10)) | - ]
+    [ MGTAVTT_G10[3] | Y[3] | 0 | (Ref(`MGTAVTT_G10)) | - ]
+    [ MGTAVTT_G10[4] | AC[2] | 0 | (Ref(`MGTAVTT_G10)) | - ]
+    [ MGTAVTT_G10[5] | AD[3] | 0 | (Ref(`MGTAVTT_G10)) | - ]
+    [ MGTAVTT_G10[6] | AG[2] | 0 | (Ref(`MGTAVTT_G10)) | - ]
+    [ MGTAVTT_G10[7] | AH[3] | 0 | (Ref(`MGTAVTT_G10)) | - ]
+    [ MGTAVTT_G10[8] | AL[2] | 0 | (Ref(`MGTAVTT_G10)) | - ]
+    [ MGTAVTT_G10[9] | AM[3] | 0 | (Ref(`MGTAVTT_G10)) | - ]
+    [ MGTVCCAUX_G11 | N[6] | 0 | (Ref(`0)) | - ]
+    [ MGTVCCAUX_G10 | R[6] | 0 | (Ref(`0)) | - ]
+    [ GND[0] | A[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[1] | A[2] | 0 | (Ref(`GND)) | - ]
+    [ GND[2] | A[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[3] | A[6] | 0 | (Ref(`GND)) | - ]
+    [ GND[4] | A[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[5] | A[17] | 0 | (Ref(`GND)) | - ]
+    [ GND[6] | A[27] | 0 | (Ref(`GND)) | - ]
+    [ GND[7] | A[34] | 0 | (Ref(`GND)) | - ]
+    [ GND[8] | B[3] | 0 | (Ref(`GND)) | - ]
+    [ GND[9] | B[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[10] | B[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[11] | B[14] | 0 | (Ref(`GND)) | - ]
+    [ GND[12] | B[24] | 0 | (Ref(`GND)) | - ]
+    [ GND[13] | C[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[14] | C[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[15] | C[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[16] | C[11] | 0 | (Ref(`GND)) | - ]
+    [ GND[17] | C[21] | 0 | (Ref(`GND)) | - ]
+    [ GND[18] | C[31] | 0 | (Ref(`GND)) | - ]
+    [ GND[19] | D[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[20] | D[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[21] | D[8] | 0 | (Ref(`GND)) | - ]
+    [ GND[22] | D[18] | 0 | (Ref(`GND)) | - ]
+    [ GND[23] | D[28] | 0 | (Ref(`GND)) | - ]
+    [ GND[24] | E[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[25] | E[2] | 0 | (Ref(`GND)) | - ]
+    [ GND[26] | E[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[27] | E[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[28] | E[15] | 0 | (Ref(`GND)) | - ]
+    [ GND[29] | E[25] | 0 | (Ref(`GND)) | - ]
+    [ GND[30] | F[3] | 0 | (Ref(`GND)) | - ]
+    [ GND[31] | F[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[32] | F[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[33] | F[12] | 0 | (Ref(`GND)) | - ]
+    [ GND[34] | F[22] | 0 | (Ref(`GND)) | - ]
+    [ GND[35] | F[32] | 0 | (Ref(`GND)) | - ]
+    [ GND[36] | G[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[37] | G[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[38] | G[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[39] | G[9] | 0 | (Ref(`GND)) | - ]
+    [ GND[40] | G[19] | 0 | (Ref(`GND)) | - ]
+    [ GND[41] | G[29] | 0 | (Ref(`GND)) | - ]
+    [ GND[42] | H[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[43] | H[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[44] | H[16] | 0 | (Ref(`GND)) | - ]
+    [ GND[45] | H[26] | 0 | (Ref(`GND)) | - ]
+    [ GND[46] | J[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[47] | J[2] | 0 | (Ref(`GND)) | - ]
+    [ GND[48] | J[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[49] | J[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[50] | J[13] | 0 | (Ref(`GND)) | - ]
+    [ GND[51] | J[23] | 0 | (Ref(`GND)) | - ]
+    [ GND[52] | J[33] | 0 | (Ref(`GND)) | - ]
+    [ GND[53] | K[3] | 0 | (Ref(`GND)) | - ]
+    [ GND[54] | K[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[55] | K[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[56] | K[10] | 0 | (Ref(`GND)) | - ]
+    [ GND[57] | K[20] | 0 | (Ref(`GND)) | - ]
+    [ GND[58] | K[30] | 0 | (Ref(`GND)) | - ]
+    [ GND[59] | L[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[60] | L[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[61] | L[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[62] | L[17] | 0 | (Ref(`GND)) | - ]
+    [ GND[63] | L[27] | 0 | (Ref(`GND)) | - ]
+    [ GND[64] | M[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[65] | M[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[66] | M[14] | 0 | (Ref(`GND)) | - ]
+    [ GND[67] | M[22] | 0 | (Ref(`GND)) | - ]
+    [ GND[68] | M[24] | 0 | (Ref(`GND)) | - ]
+    [ GND[69] | M[34] | 0 | (Ref(`GND)) | - ]
+    [ GND[70] | N[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[71] | N[2] | 0 | (Ref(`GND)) | - ]
+    [ GND[72] | N[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[73] | N[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[74] | N[11] | 0 | (Ref(`GND)) | - ]
+    [ GND[75] | N[13] | 0 | (Ref(`GND)) | - ]
+    [ GND[76] | N[15] | 0 | (Ref(`GND)) | - ]
+    [ GND[77] | N[17] | 0 | (Ref(`GND)) | - ]
+    [ GND[78] | N[19] | 0 | (Ref(`GND)) | - ]
+    [ GND[79] | N[21] | 0 | (Ref(`GND)) | - ]
+    [ GND[80] | N[31] | 0 | (Ref(`GND)) | - ]
+    [ GND[81] | P[3] | 0 | (Ref(`GND)) | - ]
+    [ GND[82] | P[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[83] | P[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[84] | P[8] | 0 | (Ref(`GND)) | - ]
+    [ GND[85] | P[10] | 0 | (Ref(`GND)) | - ]
+    [ GND[86] | P[12] | 0 | (Ref(`GND)) | - ]
+    [ GND[87] | P[14] | 0 | (Ref(`GND)) | - ]
+    [ GND[88] | P[16] | 0 | (Ref(`GND)) | - ]
+    [ GND[89] | P[18] | 0 | (Ref(`GND)) | - ]
+    [ GND[90] | P[20] | 0 | (Ref(`GND)) | - ]
+    [ GND[91] | P[22] | 0 | (Ref(`GND)) | - ]
+    [ GND[92] | P[28] | 0 | (Ref(`GND)) | - ]
+    [ GND[93] | R[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[94] | R[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[95] | R[9] | 0 | (Ref(`GND)) | - ]
+    [ GND[96] | R[11] | 0 | (Ref(`GND)) | - ]
+    [ GND[97] | R[13] | 0 | (Ref(`GND)) | - ]
+    [ GND[98] | R[15] | 0 | (Ref(`GND)) | - ]
+    [ GND[99] | R[17] | 0 | (Ref(`GND)) | - ]
+    [ GND[100] | R[19] | 0 | (Ref(`GND)) | - ]
+    [ GND[101] | R[21] | 0 | (Ref(`GND)) | - ]
+    [ GND[102] | R[25] | 0 | (Ref(`GND)) | - ]
+    [ GND[103] | T[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[104] | T[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[105] | T[10] | 0 | (Ref(`GND)) | - ]
+    [ GND[106] | T[12] | 0 | (Ref(`GND)) | - ]
+    [ GND[107] | T[14] | 0 | (Ref(`GND)) | - ]
+    [ GND[108] | T[18] | 0 | (Ref(`GND)) | - ]
+    [ GND[109] | T[20] | 0 | (Ref(`GND)) | - ]
+    [ GND[110] | T[22] | 0 | (Ref(`GND)) | - ]
+    [ GND[111] | T[32] | 0 | (Ref(`GND)) | - ]
+    [ GND[112] | U[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[113] | U[2] | 0 | (Ref(`GND)) | - ]
+    [ GND[114] | U[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[115] | U[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[116] | U[9] | 0 | (Ref(`GND)) | - ]
+    [ GND[117] | U[11] | 0 | (Ref(`GND)) | - ]
+    [ GND[118] | U[13] | 0 | (Ref(`GND)) | - ]
+    [ GND[119] | U[15] | 0 | (Ref(`GND)) | - ]
+    [ GND[120] | U[19] | 0 | (Ref(`GND)) | - ]
+    [ GND[121] | U[21] | 0 | (Ref(`GND)) | - ]
+    [ GND[122] | U[29] | 0 | (Ref(`GND)) | - ]
+    [ GND[123] | V[3] | 0 | (Ref(`GND)) | - ]
+    [ GND[124] | V[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[125] | V[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[126] | V[10] | 0 | (Ref(`GND)) | - ]
+    [ GND[127] | V[12] | 0 | (Ref(`GND)) | - ]
+    [ GND[128] | V[14] | 0 | (Ref(`GND)) | - ]
+    [ GND[129] | V[18] | 0 | (Ref(`GND)) | - ]
+    [ GND[130] | V[20] | 0 | (Ref(`GND)) | - ]
+    [ GND[131] | V[22] | 0 | (Ref(`GND)) | - ]
+    [ GND[132] | V[26] | 0 | (Ref(`GND)) | - ]
+    [ GND[133] | W[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[134] | W[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[135] | W[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[136] | W[9] | 0 | (Ref(`GND)) | - ]
+    [ GND[137] | W[11] | 0 | (Ref(`GND)) | - ]
+    [ GND[138] | W[13] | 0 | (Ref(`GND)) | - ]
+    [ GND[139] | W[15] | 0 | (Ref(`GND)) | - ]
+    [ GND[140] | W[19] | 0 | (Ref(`GND)) | - ]
+    [ GND[141] | W[21] | 0 | (Ref(`GND)) | - ]
+    [ GND[142] | W[23] | 0 | (Ref(`GND)) | - ]
+    [ GND[143] | W[33] | 0 | (Ref(`GND)) | - ]
+    [ GND[144] | Y[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[145] | Y[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[146] | Y[6] | 0 | (Ref(`GND)) | - ]
+    [ GND[147] | Y[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[148] | Y[10] | 0 | (Ref(`GND)) | - ]
+    [ GND[149] | Y[12] | 0 | (Ref(`GND)) | - ]
+    [ GND[150] | Y[14] | 0 | (Ref(`GND)) | - ]
+    [ GND[151] | Y[16] | 0 | (Ref(`GND)) | - ]
+    [ GND[152] | Y[18] | 0 | (Ref(`GND)) | - ]
+    [ GND[153] | Y[20] | 0 | (Ref(`GND)) | - ]
+    [ GND[154] | Y[22] | 0 | (Ref(`GND)) | - ]
+    [ GND[155] | Y[30] | 0 | (Ref(`GND)) | - ]
+    [ GND[156] | AA[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[157] | AA[2] | 0 | (Ref(`GND)) | - ]
+    [ GND[158] | AA[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[159] | AA[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[160] | AA[8] | 0 | (Ref(`GND)) | - ]
+    [ GND[161] | AA[9] | 0 | (Ref(`GND)) | - ]
+    [ GND[162] | AA[11] | 0 | (Ref(`GND)) | - ]
+    [ GND[163] | AA[13] | 0 | (Ref(`GND)) | - ]
+    [ GND[164] | AA[15] | 0 | (Ref(`GND)) | - ]
+    [ GND[165] | AA[17] | 0 | (Ref(`GND)) | - ]
+    [ GND[166] | AA[19] | 0 | (Ref(`GND)) | - ]
+    [ GND[167] | AA[21] | 0 | (Ref(`GND)) | - ]
+    [ GND[168] | AA[27] | 0 | (Ref(`GND)) | - ]
+    [ GND[169] | AB[3] | 0 | (Ref(`GND)) | - ]
+    [ GND[170] | AB[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[171] | AB[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[172] | AB[10] | 0 | (Ref(`GND)) | - ]
+    [ GND[173] | AB[12] | 0 | (Ref(`GND)) | - ]
+    [ GND[174] | AB[14] | 0 | (Ref(`GND)) | - ]
+    [ GND[175] | AB[16] | 0 | (Ref(`GND)) | - ]
+    [ GND[176] | AB[18] | 0 | (Ref(`GND)) | - ]
+    [ GND[177] | AB[20] | 0 | (Ref(`GND)) | - ]
+    [ GND[178] | AB[22] | 0 | (Ref(`GND)) | - ]
+    [ GND[179] | AB[24] | 0 | (Ref(`GND)) | - ]
+    [ GND[180] | AB[34] | 0 | (Ref(`GND)) | - ]
+    [ GND[181] | AC[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[182] | AC[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[183] | AC[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[184] | AC[11] | 0 | (Ref(`GND)) | - ]
+    [ GND[185] | AC[13] | 0 | (Ref(`GND)) | - ]
+    [ GND[186] | AC[21] | 0 | (Ref(`GND)) | - ]
+    [ GND[187] | AC[31] | 0 | (Ref(`GND)) | - ]
+    [ GND[188] | AD[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[189] | AD[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[190] | AD[8] | 0 | (Ref(`GND)) | - ]
+    [ GND[191] | AD[18] | 0 | (Ref(`GND)) | - ]
+    [ GND[192] | AD[28] | 0 | (Ref(`GND)) | - ]
+    [ GND[193] | AE[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[194] | AE[2] | 0 | (Ref(`GND)) | - ]
+    [ GND[195] | AE[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[196] | AE[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[197] | AE[15] | 0 | (Ref(`GND)) | - ]
+    [ GND[198] | AE[25] | 0 | (Ref(`GND)) | - ]
+    [ GND[199] | AF[3] | 0 | (Ref(`GND)) | - ]
+    [ GND[200] | AF[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[201] | AF[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[202] | AF[12] | 0 | (Ref(`GND)) | - ]
+    [ GND[203] | AF[22] | 0 | (Ref(`GND)) | - ]
+    [ GND[204] | AF[32] | 0 | (Ref(`GND)) | - ]
+    [ GND[205] | AG[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[206] | AG[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[207] | AG[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[208] | AG[9] | 0 | (Ref(`GND)) | - ]
+    [ GND[209] | AG[19] | 0 | (Ref(`GND)) | - ]
+    [ GND[210] | AG[29] | 0 | (Ref(`GND)) | - ]
+    [ GND[211] | AH[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[212] | AH[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[213] | AH[16] | 0 | (Ref(`GND)) | - ]
+    [ GND[214] | AH[26] | 0 | (Ref(`GND)) | - ]
+    [ GND[215] | AJ[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[216] | AJ[2] | 0 | (Ref(`GND)) | - ]
+    [ GND[217] | AJ[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[218] | AJ[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[219] | AJ[13] | 0 | (Ref(`GND)) | - ]
+    [ GND[220] | AJ[23] | 0 | (Ref(`GND)) | - ]
+    [ GND[221] | AJ[33] | 0 | (Ref(`GND)) | - ]
+    [ GND[222] | AK[3] | 0 | (Ref(`GND)) | - ]
+    [ GND[223] | AK[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[224] | AK[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[225] | AK[10] | 0 | (Ref(`GND)) | - ]
+    [ GND[226] | AK[20] | 0 | (Ref(`GND)) | - ]
+    [ GND[227] | AK[30] | 0 | (Ref(`GND)) | - ]
+    [ GND[228] | AL[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[229] | AL[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[230] | AL[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[231] | AL[17] | 0 | (Ref(`GND)) | - ]
+    [ GND[232] | AL[27] | 0 | (Ref(`GND)) | - ]
+    [ GND[233] | AM[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[234] | AM[7] | 0 | (Ref(`GND)) | - ]
+    [ GND[235] | AM[8] | 0 | (Ref(`GND)) | - ]
+    [ GND[236] | AM[14] | 0 | (Ref(`GND)) | - ]
+    [ GND[237] | AM[24] | 0 | (Ref(`GND)) | - ]
+    [ GND[238] | AM[34] | 0 | (Ref(`GND)) | - ]
+    [ GND[239] | AN[1] | 0 | (Ref(`GND)) | - ]
+    [ GND[240] | AN[2] | 0 | (Ref(`GND)) | - ]
+    [ GND[241] | AN[5] | 0 | (Ref(`GND)) | - ]
+    [ GND[242] | AN[8] | 0 | (Ref(`GND)) | - ]
+    [ GND[243] | AN[11] | 0 | (Ref(`GND)) | - ]
+    [ GND[244] | AN[21] | 0 | (Ref(`GND)) | - ]
+    [ GND[245] | AN[31] | 0 | (Ref(`GND)) | - ]
+    [ GND[246] | AP[3] | 0 | (Ref(`GND)) | - ]
+    [ GND[247] | AP[4] | 0 | (Ref(`GND)) | - ]
+    [ GND[248] | AP[8] | 0 | (Ref(`GND)) | - ]
+    [ GND[249] | AP[18] | 0 | (Ref(`GND)) | - ]
+    [ GND[250] | AP[28] | 0 | (Ref(`GND)) | - ]
+    [ VCCINT[0] | M[21] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[1] | M[23] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[2] | N[10] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[3] | N[12] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[4] | N[16] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[5] | N[22] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[6] | P[11] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[7] | P[13] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[8] | P[15] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[9] | P[17] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[10] | P[19] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[11] | P[21] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[12] | R[10] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[13] | R[12] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[14] | R[16] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[15] | R[22] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[16] | T[11] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[17] | T[15] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[18] | T[19] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[19] | T[23] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[20] | U[10] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[21] | U[12] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[22] | U[22] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[23] | V[11] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[24] | V[15] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[25] | V[19] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[26] | W[10] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[27] | W[12] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[28] | W[22] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[29] | Y[9] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[30] | Y[11] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[31] | Y[15] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[32] | Y[17] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[33] | Y[19] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[34] | Y[23] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[35] | AA[10] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[36] | AA[12] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[37] | AA[16] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[38] | AA[22] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[39] | AB[11] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[40] | AB[15] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[41] | AB[19] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCINT[42] | AB[23] | 0 | (Ref(`VCCINT)) | - ]
+    [ VCCAUX[0] | T[13] | 0 | (Ref(`VCCAUX)) | - ]
+    [ VCCAUX[1] | T[21] | 0 | (Ref(`VCCAUX)) | - ]
+    [ VCCAUX[2] | V[13] | 0 | (Ref(`VCCAUX)) | - ]
+    [ VCCAUX[3] | V[21] | 0 | (Ref(`VCCAUX)) | - ]
+    [ VCCAUX[4] | Y[13] | 0 | (Ref(`VCCAUX)) | - ]
+    [ VCCAUX[5] | Y[21] | 0 | (Ref(`VCCAUX)) | - ]
+    [ VCCAUX[6] | AB[13] | 0 | (Ref(`VCCAUX)) | - ]
+    [ VCCAUX[7] | AB[21] | 0 | (Ref(`VCCAUX)) | - ]
+    [ VCCAUX_IO_G0[0] | W[20] | 0 | (Ref(`VCCAUX_IO_G0)) | - ]
+    [ VCCAUX_IO_G0[1] | AA[20] | 0 | (Ref(`VCCAUX_IO_G0)) | - ]
+    [ VCCAUX_IO_G0[2] | AC[20] | 0 | (Ref(`VCCAUX_IO_G0)) | - ]
+    [ VCCAUX_IO_G1[0] | N[20] | 0 | (Ref(`VCCAUX_IO_G1)) | - ]
+    [ VCCAUX_IO_G1[1] | R[20] | 0 | (Ref(`VCCAUX_IO_G1)) | - ]
+    [ VCCAUX_IO_G1[2] | U[20] | 0 | (Ref(`VCCAUX_IO_G1)) | - ]
+    [ VCCAUX_IO_G2[0] | W[14] | 0 | (Ref(`VCCAUX_IO_G2)) | - ]
+    [ VCCAUX_IO_G2[1] | AA[14] | 0 | (Ref(`VCCAUX_IO_G2)) | - ]
+    [ VCCAUX_IO_G2[2] | AC[14] | 0 | (Ref(`VCCAUX_IO_G2)) | - ]
+    [ VCCAUX_IO_G3[0] | N[14] | 0 | (Ref(`VCCAUX_IO_G3)) | - ]
+    [ VCCAUX_IO_G3[1] | R[14] | 0 | (Ref(`VCCAUX_IO_G3)) | - ]
+    [ VCCAUX_IO_G3[2] | U[14] | 0 | (Ref(`VCCAUX_IO_G3)) | - ]
+    [ VCCO[0] | W[8] | 0 | (Ref(`VCCO)) | - ]
+    [ VCCO[1] | AB[9] | 0 | (Ref(`VCCO)) | - ]
+    [ VCCO_14[0] | AG[24] | 14 | (Ref(`VCCO_14)) | - ]
+    [ VCCO_14[1] | AJ[28] | 14 | (Ref(`VCCO_14)) | - ]
+    [ VCCO_14[2] | AL[32] | 14 | (Ref(`VCCO_14)) | - ]
+    [ VCCO_14[3] | AM[29] | 14 | (Ref(`VCCO_14)) | - ]
+    [ VCCO_14[4] | AN[26] | 14 | (Ref(`VCCO_14)) | - ]
+    [ VCCO_14[5] | AP[34] | 14 | (Ref(`VCCO_14)) | - ]
+    [ VCCO_15[0] | AC[26] | 15 | (Ref(`VCCO_15)) | - ]
+    [ VCCO_15[1] | AD[23] | 15 | (Ref(`VCCO_15)) | - ]
+    [ VCCO_15[2] | AD[33] | 15 | (Ref(`VCCO_15)) | - ]
+    [ VCCO_15[3] | AE[30] | 15 | (Ref(`VCCO_15)) | - ]
+    [ VCCO_15[4] | AF[27] | 15 | (Ref(`VCCO_15)) | - ]
+    [ VCCO_15[5] | AG[34] | 15 | (Ref(`VCCO_15)) | - ]
+    [ VCCO_15[6] | AH[31] | 15 | (Ref(`VCCO_15)) | - ]
+    [ VCCO_16[0] | U[24] | 16 | (Ref(`VCCO_16)) | - ]
+    [ VCCO_16[1] | V[31] | 16 | (Ref(`VCCO_16)) | - ]
+    [ VCCO_16[2] | W[28] | 16 | (Ref(`VCCO_16)) | - ]
+    [ VCCO_16[3] | Y[25] | 16 | (Ref(`VCCO_16)) | - ]
+    [ VCCO_16[4] | AA[32] | 16 | (Ref(`VCCO_16)) | - ]
+    [ VCCO_16[5] | AB[29] | 16 | (Ref(`VCCO_16)) | - ]
+    [ VCCO_17[0] | N[26] | 17 | (Ref(`VCCO_17)) | - ]
+    [ VCCO_17[1] | P[23] | 17 | (Ref(`VCCO_17)) | - ]
+    [ VCCO_17[2] | P[33] | 17 | (Ref(`VCCO_17)) | - ]
+    [ VCCO_17[3] | R[30] | 17 | (Ref(`VCCO_17)) | - ]
+    [ VCCO_17[4] | T[27] | 17 | (Ref(`VCCO_17)) | - ]
+    [ VCCO_17[5] | U[34] | 17 | (Ref(`VCCO_17)) | - ]
+    [ VCCO_18[0] | G[34] | 18 | (Ref(`VCCO_18)) | - ]
+    [ VCCO_18[1] | H[31] | 18 | (Ref(`VCCO_18)) | - ]
+    [ VCCO_18[2] | J[28] | 18 | (Ref(`VCCO_18)) | - ]
+    [ VCCO_18[3] | K[25] | 18 | (Ref(`VCCO_18)) | - ]
+    [ VCCO_18[4] | L[22] | 18 | (Ref(`VCCO_18)) | - ]
+    [ VCCO_18[5] | L[32] | 18 | (Ref(`VCCO_18)) | - ]
+    [ VCCO_18[6] | M[29] | 18 | (Ref(`VCCO_18)) | - ]
+    [ VCCO_19[0] | A[32] | 19 | (Ref(`VCCO_19)) | - ]
+    [ VCCO_19[1] | B[29] | 19 | (Ref(`VCCO_19)) | - ]
+    [ VCCO_19[2] | C[26] | 19 | (Ref(`VCCO_19)) | - ]
+    [ VCCO_19[3] | D[33] | 19 | (Ref(`VCCO_19)) | - ]
+    [ VCCO_19[4] | E[30] | 19 | (Ref(`VCCO_19)) | - ]
+    [ VCCO_19[5] | F[27] | 19 | (Ref(`VCCO_19)) | - ]
+    [ VCCO_19[6] | G[24] | 19 | (Ref(`VCCO_19)) | - ]
+    [ VCCO_34[0] | AD[13] | 34 | (Ref(`VCCO_34)) | - ]
+    [ VCCO_34[1] | AE[10] | 34 | (Ref(`VCCO_34)) | - ]
+    [ VCCO_34[2] | AH[11] | 34 | (Ref(`VCCO_34)) | - ]
+    [ VCCO_34[3] | AJ[8] | 34 | (Ref(`VCCO_34)) | - ]
+    [ VCCO_34[4] | AL[12] | 34 | (Ref(`VCCO_34)) | - ]
+    [ VCCO_34[5] | AM[9] | 34 | (Ref(`VCCO_34)) | - ]
+    [ VCCO_34[6] | AP[13] | 34 | (Ref(`VCCO_34)) | - ]
+    [ VCCO_35[0] | AC[16] | 35 | (Ref(`VCCO_35)) | - ]
+    [ VCCO_35[1] | AF[17] | 35 | (Ref(`VCCO_35)) | - ]
+    [ VCCO_35[2] | AG[14] | 35 | (Ref(`VCCO_35)) | - ]
+    [ VCCO_35[3] | AJ[18] | 35 | (Ref(`VCCO_35)) | - ]
+    [ VCCO_35[4] | AK[15] | 35 | (Ref(`VCCO_35)) | - ]
+    [ VCCO_35[5] | AN[16] | 35 | (Ref(`VCCO_35)) | - ]
+    [ VCCO_36[0] | AE[20] | 36 | (Ref(`VCCO_36)) | - ]
+    [ VCCO_36[1] | AH[21] | 36 | (Ref(`VCCO_36)) | - ]
+    [ VCCO_36[2] | AK[25] | 36 | (Ref(`VCCO_36)) | - ]
+    [ VCCO_36[3] | AL[22] | 36 | (Ref(`VCCO_36)) | - ]
+    [ VCCO_36[4] | AM[19] | 36 | (Ref(`VCCO_36)) | - ]
+    [ VCCO_36[5] | AP[23] | 36 | (Ref(`VCCO_36)) | - ]
+    [ VCCO_37[0] | A[22] | 37 | (Ref(`VCCO_37)) | - ]
+    [ VCCO_37[1] | B[19] | 37 | (Ref(`VCCO_37)) | - ]
+    [ VCCO_37[2] | D[23] | 37 | (Ref(`VCCO_37)) | - ]
+    [ VCCO_37[3] | E[20] | 37 | (Ref(`VCCO_37)) | - ]
+    [ VCCO_37[4] | H[21] | 37 | (Ref(`VCCO_37)) | - ]
+    [ VCCO_37[5] | J[18] | 37 | (Ref(`VCCO_37)) | - ]
+    [ VCCO_37[6] | M[19] | 37 | (Ref(`VCCO_37)) | - ]
+    [ VCCO_38[0] | A[12] | 38 | (Ref(`VCCO_38)) | - ]
+    [ VCCO_38[1] | C[16] | 38 | (Ref(`VCCO_38)) | - ]
+    [ VCCO_38[2] | D[13] | 38 | (Ref(`VCCO_38)) | - ]
+    [ VCCO_38[3] | F[17] | 38 | (Ref(`VCCO_38)) | - ]
+    [ VCCO_38[4] | G[14] | 38 | (Ref(`VCCO_38)) | - ]
+    [ VCCO_38[5] | K[15] | 38 | (Ref(`VCCO_38)) | - ]
+    [ VCCO_39[0] | B[9] | 39 | (Ref(`VCCO_39)) | - ]
+    [ VCCO_39[1] | E[10] | 39 | (Ref(`VCCO_39)) | - ]
+    [ VCCO_39[2] | H[11] | 39 | (Ref(`VCCO_39)) | - ]
+    [ VCCO_39[3] | J[8] | 39 | (Ref(`VCCO_39)) | - ]
+    [ VCCO_39[4] | L[12] | 39 | (Ref(`VCCO_39)) | - ]
+    [ VCCO_39[5] | M[9] | 39 | (Ref(`VCCO_39)) | - ]
+    [ NC[0] | R[7] | 0 | (Ref(`NC)) | - ]
+    [ NC[1] | R[8] | 0 | (Ref(`NC)) | - ]
+    [ IO[34].S[0] | AC[12] | 34 | (Ref(`34)) | - ]
+    [ IO[34].D[1].P | AE[9] | 34 | (Ref(`34)) | 0 ]
+    [ IO[34].D[1].N | AE[8] | 34 | (Ref(`34)) | 0 ]
+    [ IO[34].D[2].P | AC[10] | 34 | (Ref(`34)) | 0 ]
+    [ IO[34].D[2].N | AC[9] | 34 | (Ref(`34)) | 0 ]
+    [ IO[34].D[3].P | AE[12] | 34 | (Ref(`34)) | 0 ]
+    [ IO[34].D[3].N | AE[11] | 34 | (Ref(`34)) | 0 ]
+    [ IO[34].D[4].P | AD[10] | 34 | (Ref(`34)) | 0 ]
+    [ IO[34].D[4].N | AD[9] | 34 | (Ref(`34)) | 0 ]
+    [ IO[34].D[5].P | AF[9] | 34 | (Ref(`34)) | 0 ]
+    [ IO[34].D[5].N | AF[8] | 34 | (Ref(`34)) | 0 ]
+    [ IO[34].D[6].P | AD[12] | 34 | (Ref(`34)) | 0 ]
+    [ IO[34].D[6].N | AD[11] | 34 | (Ref(`34)) | 0 ]
+    [ IO[34].D[7].P | AF[11] | 34 | (Ref(`34)) | 1 ]
+    [ IO[34].D[7].N | AG[11] | 34 | (Ref(`34)) | 1 ]
+    [ IO[34].D[8].P | AG[8] | 34 | (Ref(`34)) | 1 ]
+    [ IO[34].D[8].N | AH[8] | 34 | (Ref(`34)) | 1 ]
+    [ IO[34].D[9].P | AG[12] | 34 | (Ref(`34)) | 1 ]
+    [ IO[34].D[9].N | AH[12] | 34 | (Ref(`34)) | 1 ]
+    [ IO[34].D[10].P | AF[10] | 34 | (Ref(`34)) | 1 ]
+    [ IO[34].D[10].N | AG[10] | 34 | (Ref(`34)) | 1 ]
+    [ IO[34].D[11].P | AH[10] | 34 | (Ref(`34)) | 1 ]
+    [ IO[34].D[11].N | AJ[10] | 34 | (Ref(`34)) | 1 ]
+    [ IO[34].D[12].P | AH[9] | 34 | (Ref(`34)) | 1 ]
+    [ IO[34].D[12].N | AJ[9] | 34 | (Ref(`34)) | 1 ]
+    [ IO[34].D[13].P | AJ[11] | 34 | (Ref(`34)) | 2 ]
+    [ IO[34].D[13].N | AK[11] | 34 | (Ref(`34)) | 2 ]
+    [ IO[34].D[14].P | AJ[12] | 34 | (Ref(`34)) | 2 ]
+    [ IO[34].D[14].N | AK[12] | 34 | (Ref(`34)) | 2 ]
+    [ IO[34].D[15].P | AK[8] | 34 | (Ref(`34)) | 2 ]
+    [ IO[34].D[15].N | AL[8] | 34 | (Ref(`34)) | 2 ]
+    [ IO[34].D[16].P | AL[10] | 34 | (Ref(`34)) | 2 ]
+    [ IO[34].D[16].N | AM[10] | 34 | (Ref(`34)) | 2 ]
+    [ IO[34].D[17].P | AK[9] | 34 | (Ref(`34)) | 2 ]
+    [ IO[34].D[17].N | AL[9] | 34 | (Ref(`34)) | 2 ]
+    [ IO[34].D[18].P | AL[11] | 34 | (Ref(`34)) | 2 ]
+    [ IO[34].D[18].N | AM[11] | 34 | (Ref(`34)) | 2 ]
+    [ IO[34].D[19].P | AM[12] | 34 | (Ref(`34)) | 3 ]
+    [ IO[34].D[19].N | AN[12] | 34 | (Ref(`34)) | 3 ]
+    [ IO[34].D[20].P | AN[9] | 34 | (Ref(`34)) | 3 ]
+    [ IO[34].D[20].N | AP[9] | 34 | (Ref(`34)) | 3 ]
+    [ IO[34].D[21].P | AN[10] | 34 | (Ref(`34)) | 3 ]
+    [ IO[34].D[21].N | AP[10] | 34 | (Ref(`34)) | 3 ]
+    [ IO[34].D[22].P | AP[12] | 34 | (Ref(`34)) | 3 ]
+    [ IO[34].D[22].N | AP[11] | 34 | (Ref(`34)) | 3 ]
+    [ IO[34].D[23].P | AM[13] | 34 | (Ref(`34)) | 3 ]
+    [ IO[34].D[23].N | AN[13] | 34 | (Ref(`34)) | 3 ]
+    [ IO[34].D[24].P | AK[13] | 34 | (Ref(`34)) | 3 ]
+    [ IO[34].D[24].N | AL[13] | 34 | (Ref(`34)) | 3 ]
+    [ IO[34].S[25] | AH[13] | 34 | (Ref(`34)) | - ]
+    [ IO[35].S[0] | AE[18] | 35 | (Ref(`35)) | - ]
+    [ IO[35].D[1].P | AN[15] | 35 | (Ref(`35)) | 0 ]
+    [ IO[35].D[1].N | AP[15] | 35 | (Ref(`35)) | 0 ]
+    [ IO[35].D[2].P | AM[18] | 35 | (Ref(`35)) | 0 ]
+    [ IO[35].D[2].N | AN[18] | 35 | (Ref(`35)) | 0 ]
+    [ IO[35].D[3].P | AL[16] | 35 | (Ref(`35)) | 0 ]
+    [ IO[35].D[3].N | AM[16] | 35 | (Ref(`35)) | 0 ]
+    [ IO[35].D[4].P | AP[17] | 35 | (Ref(`35)) | 0 ]
+    [ IO[35].D[4].N | AP[16] | 35 | (Ref(`35)) | 0 ]
+    [ IO[35].D[5].P | AN[14] | 35 | (Ref(`35)) | 0 ]
+    [ IO[35].D[5].N | AP[14] | 35 | (Ref(`35)) | 0 ]
+    [ IO[35].D[6].P | AM[17] | 35 | (Ref(`35)) | 0 ]
+    [ IO[35].D[6].N | AN[17] | 35 | (Ref(`35)) | 0 ]
+    [ IO[35].D[7].P | AL[15] | 35 | (Ref(`35)) | 1 ]
+    [ IO[35].D[7].N | AM[15] | 35 | (Ref(`35)) | 1 ]
+    [ IO[35].D[8].P | AK[18] | 35 | (Ref(`35)) | 1 ]
+    [ IO[35].D[8].N | AL[18] | 35 | (Ref(`35)) | 1 ]
+    [ IO[35].D[9].P | AK[14] | 35 | (Ref(`35)) | 1 ]
+    [ IO[35].D[9].N | AL[14] | 35 | (Ref(`35)) | 1 ]
+    [ IO[35].D[10].P | AJ[17] | 35 | (Ref(`35)) | 1 ]
+    [ IO[35].D[10].N | AK[17] | 35 | (Ref(`35)) | 1 ]
+    [ IO[35].D[11].P | AJ[16] | 35 | (Ref(`35)) | 1 ]
+    [ IO[35].D[11].N | AK[16] | 35 | (Ref(`35)) | 1 ]
+    [ IO[35].D[12].P | AH[15] | 35 | (Ref(`35)) | 1 ]
+    [ IO[35].D[12].N | AJ[15] | 35 | (Ref(`35)) | 1 ]
+    [ IO[35].D[13].P | AG[17] | 35 | (Ref(`35)) | 2 ]
+    [ IO[35].D[13].N | AH[17] | 35 | (Ref(`35)) | 2 ]
+    [ IO[35].D[14].P | AF[16] | 35 | (Ref(`35)) | 2 ]
+    [ IO[35].D[14].N | AG[16] | 35 | (Ref(`35)) | 2 ]
+    [ IO[35].D[15].P | AF[18] | 35 | (Ref(`35)) | 2 ]
+    [ IO[35].D[15].N | AG[18] | 35 | (Ref(`35)) | 2 ]
+    [ IO[35].D[16].P | AF[15] | 35 | (Ref(`35)) | 2 ]
+    [ IO[35].D[16].N | AG[15] | 35 | (Ref(`35)) | 2 ]
+    [ IO[35].D[17].P | AH[19] | 35 | (Ref(`35)) | 2 ]
+    [ IO[35].D[17].N | AH[18] | 35 | (Ref(`35)) | 2 ]
+    [ IO[35].D[18].P | AH[14] | 35 | (Ref(`35)) | 2 ]
+    [ IO[35].D[18].N | AJ[14] | 35 | (Ref(`35)) | 2 ]
+    [ IO[35].D[19].P | AF[13] | 35 | (Ref(`35)) | 3 ]
+    [ IO[35].D[19].N | AG[13] | 35 | (Ref(`35)) | 3 ]
+    [ IO[35].D[20].P | AE[17] | 35 | (Ref(`35)) | 3 ]
+    [ IO[35].D[20].N | AE[16] | 35 | (Ref(`35)) | 3 ]
+    [ IO[35].D[21].P | AE[14] | 35 | (Ref(`35)) | 3 ]
+    [ IO[35].D[21].N | AF[14] | 35 | (Ref(`35)) | 3 ]
+    [ IO[35].D[22].P | AC[17] | 35 | (Ref(`35)) | 3 ]
+    [ IO[35].D[22].N | AD[17] | 35 | (Ref(`35)) | 3 ]
+    [ IO[35].D[23].P | AD[14] | 35 | (Ref(`35)) | 3 ]
+    [ IO[35].D[23].N | AE[13] | 35 | (Ref(`35)) | 3 ]
+    [ IO[35].D[24].P | AD[16] | 35 | (Ref(`35)) | 3 ]
+    [ IO[35].D[24].N | AD[15] | 35 | (Ref(`35)) | 3 ]
+    [ IO[35].S[25] | AC[15] | 35 | (Ref(`35)) | - ]
+    [ IO[36].S[0] | AC[22] | 36 | (Ref(`36)) | - ]
+    [ IO[36].D[1].P | AN[24] | 36 | (Ref(`36)) | 0 ]
+    [ IO[36].D[1].N | AP[24] | 36 | (Ref(`36)) | 0 ]
+    [ IO[36].D[2].P | AN[20] | 36 | (Ref(`36)) | 0 ]
+    [ IO[36].D[2].N | AP[20] | 36 | (Ref(`36)) | 0 ]
+    [ IO[36].D[3].P | AM[22] | 36 | (Ref(`36)) | 0 ]
+    [ IO[36].D[3].N | AN[22] | 36 | (Ref(`36)) | 0 ]
+    [ IO[36].D[4].P | AN[19] | 36 | (Ref(`36)) | 0 ]
+    [ IO[36].D[4].N | AP[19] | 36 | (Ref(`36)) | 0 ]
+    [ IO[36].D[5].P | AP[21] | 36 | (Ref(`36)) | 0 ]
+    [ IO[36].D[5].N | AP[22] | 36 | (Ref(`36)) | 0 ]
+    [ IO[36].D[6].P | AM[23] | 36 | (Ref(`36)) | 0 ]
+    [ IO[36].D[6].N | AN[23] | 36 | (Ref(`36)) | 0 ]
+    [ IO[36].D[7].P | AM[20] | 36 | (Ref(`36)) | 1 ]
+    [ IO[36].D[7].N | AM[21] | 36 | (Ref(`36)) | 1 ]
+    [ IO[36].D[8].P | AK[24] | 36 | (Ref(`36)) | 1 ]
+    [ IO[36].D[8].N | AL[24] | 36 | (Ref(`36)) | 1 ]
+    [ IO[36].D[9].P | AK[19] | 36 | (Ref(`36)) | 1 ]
+    [ IO[36].D[9].N | AL[19] | 36 | (Ref(`36)) | 1 ]
+    [ IO[36].D[10].P | AK[23] | 36 | (Ref(`36)) | 1 ]
+    [ IO[36].D[10].N | AL[23] | 36 | (Ref(`36)) | 1 ]
+    [ IO[36].D[11].P | AL[20] | 36 | (Ref(`36)) | 1 ]
+    [ IO[36].D[11].N | AL[21] | 36 | (Ref(`36)) | 1 ]
+    [ IO[36].D[12].P | AJ[22] | 36 | (Ref(`36)) | 1 ]
+    [ IO[36].D[12].N | AK[22] | 36 | (Ref(`36)) | 1 ]
+    [ IO[36].D[13].P | AG[22] | 36 | (Ref(`36)) | 2 ]
+    [ IO[36].D[13].N | AH[22] | 36 | (Ref(`36)) | 2 ]
+    [ IO[36].D[14].P | AJ[21] | 36 | (Ref(`36)) | 2 ]
+    [ IO[36].D[14].N | AK[21] | 36 | (Ref(`36)) | 2 ]
+    [ IO[36].D[15].P | AF[23] | 36 | (Ref(`36)) | 2 ]
+    [ IO[36].D[15].N | AG[23] | 36 | (Ref(`36)) | 2 ]
+    [ IO[36].D[16].P | AJ[19] | 36 | (Ref(`36)) | 2 ]
+    [ IO[36].D[16].N | AJ[20] | 36 | (Ref(`36)) | 2 ]
+    [ IO[36].D[17].P | AH[23] | 36 | (Ref(`36)) | 2 ]
+    [ IO[36].D[17].N | AJ[24] | 36 | (Ref(`36)) | 2 ]
+    [ IO[36].D[18].P | AG[20] | 36 | (Ref(`36)) | 2 ]
+    [ IO[36].D[18].N | AH[20] | 36 | (Ref(`36)) | 2 ]
+    [ IO[36].D[19].P | AC[19] | 36 | (Ref(`36)) | 3 ]
+    [ IO[36].D[19].N | AD[20] | 36 | (Ref(`36)) | 3 ]
+    [ IO[36].D[20].P | AD[22] | 36 | (Ref(`36)) | 3 ]
+    [ IO[36].D[20].N | AE[22] | 36 | (Ref(`36)) | 3 ]
+    [ IO[36].D[21].P | AF[19] | 36 | (Ref(`36)) | 3 ]
+    [ IO[36].D[21].N | AF[20] | 36 | (Ref(`36)) | 3 ]
+    [ IO[36].D[22].P | AD[21] | 36 | (Ref(`36)) | 3 ]
+    [ IO[36].D[22].N | AE[21] | 36 | (Ref(`36)) | 3 ]
+    [ IO[36].D[23].P | AD[19] | 36 | (Ref(`36)) | 3 ]
+    [ IO[36].D[23].N | AE[19] | 36 | (Ref(`36)) | 3 ]
+    [ IO[36].D[24].P | AF[21] | 36 | (Ref(`36)) | 3 ]
+    [ IO[36].D[24].N | AG[21] | 36 | (Ref(`36)) | 3 ]
+    [ IO[36].S[25] | AC[18] | 36 | (Ref(`36)) | - ]
+    [ IO[37].S[0] | H[18] | 37 | (Ref(`37)) | - ]
+    [ IO[37].D[1].P | L[19] | 37 | (Ref(`37)) | 0 ]
+    [ IO[37].D[1].N | K[19] | 37 | (Ref(`37)) | 0 ]
+    [ IO[37].D[2].P | M[18] | 37 | (Ref(`37)) | 0 ]
+    [ IO[37].D[2].N | L[18] | 37 | (Ref(`37)) | 0 ]
+    [ IO[37].D[3].P | J[20] | 37 | (Ref(`37)) | 0 ]
+    [ IO[37].D[3].N | H[20] | 37 | (Ref(`37)) | 0 ]
+    [ IO[37].D[4].P | K[18] | 37 | (Ref(`37)) | 0 ]
+    [ IO[37].D[4].N | J[19] | 37 | (Ref(`37)) | 0 ]
+    [ IO[37].D[5].P | M[20] | 37 | (Ref(`37)) | 0 ]
+    [ IO[37].D[5].N | L[20] | 37 | (Ref(`37)) | 0 ]
+    [ IO[37].D[6].P | H[19] | 37 | (Ref(`37)) | 0 ]
+    [ IO[37].D[6].N | G[20] | 37 | (Ref(`37)) | 0 ]
+    [ IO[37].D[7].P | A[19] | 37 | (Ref(`37)) | 1 ]
+    [ IO[37].D[7].N | A[20] | 37 | (Ref(`37)) | 1 ]
+    [ IO[37].D[8].P | E[19] | 37 | (Ref(`37)) | 1 ]
+    [ IO[37].D[8].N | D[19] | 37 | (Ref(`37)) | 1 ]
+    [ IO[37].D[9].P | B[21] | 37 | (Ref(`37)) | 1 ]
+    [ IO[37].D[9].N | A[21] | 37 | (Ref(`37)) | 1 ]
+    [ IO[37].D[10].P | C[19] | 37 | (Ref(`37)) | 1 ]
+    [ IO[37].D[10].N | B[20] | 37 | (Ref(`37)) | 1 ]
+    [ IO[37].D[11].P | D[20] | 37 | (Ref(`37)) | 1 ]
+    [ IO[37].D[11].N | C[20] | 37 | (Ref(`37)) | 1 ]
+    [ IO[37].D[12].P | E[21] | 37 | (Ref(`37)) | 1 ]
+    [ IO[37].D[12].N | D[21] | 37 | (Ref(`37)) | 1 ]
+    [ IO[37].D[13].P | G[21] | 37 | (Ref(`37)) | 2 ]
+    [ IO[37].D[13].N | F[21] | 37 | (Ref(`37)) | 2 ]
+    [ IO[37].D[14].P | H[22] | 37 | (Ref(`37)) | 2 ]
+    [ IO[37].D[14].N | G[22] | 37 | (Ref(`37)) | 2 ]
+    [ IO[37].D[15].P | F[19] | 37 | (Ref(`37)) | 2 ]
+    [ IO[37].D[15].N | F[20] | 37 | (Ref(`37)) | 2 ]
+    [ IO[37].D[16].P | H[23] | 37 | (Ref(`37)) | 2 ]
+    [ IO[37].D[16].N | G[23] | 37 | (Ref(`37)) | 2 ]
+    [ IO[37].D[17].P | K[21] | 37 | (Ref(`37)) | 2 ]
+    [ IO[37].D[17].N | J[21] | 37 | (Ref(`37)) | 2 ]
+    [ IO[37].D[18].P | K[22] | 37 | (Ref(`37)) | 2 ]
+    [ IO[37].D[18].N | J[22] | 37 | (Ref(`37)) | 2 ]
+    [ IO[37].D[19].P | E[22] | 37 | (Ref(`37)) | 3 ]
+    [ IO[37].D[19].N | D[22] | 37 | (Ref(`37)) | 3 ]
+    [ IO[37].D[20].P | A[23] | 37 | (Ref(`37)) | 3 ]
+    [ IO[37].D[20].N | A[24] | 37 | (Ref(`37)) | 3 ]
+    [ IO[37].D[21].P | C[22] | 37 | (Ref(`37)) | 3 ]
+    [ IO[37].D[21].N | B[22] | 37 | (Ref(`37)) | 3 ]
+    [ IO[37].D[22].P | C[23] | 37 | (Ref(`37)) | 3 ]
+    [ IO[37].D[22].N | B[23] | 37 | (Ref(`37)) | 3 ]
+    [ IO[37].D[23].P | F[23] | 37 | (Ref(`37)) | 3 ]
+    [ IO[37].D[23].N | E[23] | 37 | (Ref(`37)) | 3 ]
+    [ IO[37].D[24].P | D[24] | 37 | (Ref(`37)) | 3 ]
+    [ IO[37].D[24].N | C[24] | 37 | (Ref(`37)) | 3 ]
+    [ IO[37].S[25] | L[21] | 37 | (Ref(`37)) | - ]
+    [ IO[38].S[0] | L[16] | 38 | (Ref(`38)) | - ]
+    [ IO[38].D[1].P | J[15] | 38 | (Ref(`38)) | 0 ]
+    [ IO[38].D[1].N | H[15] | 38 | (Ref(`38)) | 0 ]
+    [ IO[38].D[2].P | M[15] | 38 | (Ref(`38)) | 0 ]
+    [ IO[38].D[2].N | L[15] | 38 | (Ref(`38)) | 0 ]
+    [ IO[38].D[3].P | M[17] | 38 | (Ref(`38)) | 0 ]
+    [ IO[38].D[3].N | M[16] | 38 | (Ref(`38)) | 0 ]
+    [ IO[38].D[4].P | L[14] | 38 | (Ref(`38)) | 0 ]
+    [ IO[38].D[4].N | K[14] | 38 | (Ref(`38)) | 0 ]
+    [ IO[38].D[5].P | K[17] | 38 | (Ref(`38)) | 0 ]
+    [ IO[38].D[5].N | J[17] | 38 | (Ref(`38)) | 0 ]
+    [ IO[38].D[6].P | K[16] | 38 | (Ref(`38)) | 0 ]
+    [ IO[38].D[6].N | J[16] | 38 | (Ref(`38)) | 0 ]
+    [ IO[38].D[7].P | F[14] | 38 | (Ref(`38)) | 1 ]
+    [ IO[38].D[7].N | E[13] | 38 | (Ref(`38)) | 1 ]
+    [ IO[38].D[8].P | J[14] | 38 | (Ref(`38)) | 1 ]
+    [ IO[38].D[8].N | H[14] | 38 | (Ref(`38)) | 1 ]
+    [ IO[38].D[9].P | H[17] | 38 | (Ref(`38)) | 1 ]
+    [ IO[38].D[9].N | G[17] | 38 | (Ref(`38)) | 1 ]
+    [ IO[38].D[10].P | G[13] | 38 | (Ref(`38)) | 1 ]
+    [ IO[38].D[10].N | F[13] | 38 | (Ref(`38)) | 1 ]
+    [ IO[38].D[11].P | G[16] | 38 | (Ref(`38)) | 1 ]
+    [ IO[38].D[11].N | F[16] | 38 | (Ref(`38)) | 1 ]
+    [ IO[38].D[12].P | G[15] | 38 | (Ref(`38)) | 1 ]
+    [ IO[38].D[12].N | F[15] | 38 | (Ref(`38)) | 1 ]
+    [ IO[38].D[13].P | E[16] | 38 | (Ref(`38)) | 2 ]
+    [ IO[38].D[13].N | D[16] | 38 | (Ref(`38)) | 2 ]
+    [ IO[38].D[14].P | E[17] | 38 | (Ref(`38)) | 2 ]
+    [ IO[38].D[14].N | D[17] | 38 | (Ref(`38)) | 2 ]
+    [ IO[38].D[15].P | E[14] | 38 | (Ref(`38)) | 2 ]
+    [ IO[38].D[15].N | D[14] | 38 | (Ref(`38)) | 2 ]
+    [ IO[38].D[16].P | F[18] | 38 | (Ref(`38)) | 2 ]
+    [ IO[38].D[16].N | E[18] | 38 | (Ref(`38)) | 2 ]
+    [ IO[38].D[17].P | D[15] | 38 | (Ref(`38)) | 2 ]
+    [ IO[38].D[17].N | C[14] | 38 | (Ref(`38)) | 2 ]
+    [ IO[38].D[18].P | C[18] | 38 | (Ref(`38)) | 2 ]
+    [ IO[38].D[18].N | C[17] | 38 | (Ref(`38)) | 2 ]
+    [ IO[38].D[19].P | C[13] | 38 | (Ref(`38)) | 3 ]
+    [ IO[38].D[19].N | B[13] | 38 | (Ref(`38)) | 3 ]
+    [ IO[38].D[20].P | B[16] | 38 | (Ref(`38)) | 3 ]
+    [ IO[38].D[20].N | A[15] | 38 | (Ref(`38)) | 3 ]
+    [ IO[38].D[21].P | A[14] | 38 | (Ref(`38)) | 3 ]
+    [ IO[38].D[21].N | A[13] | 38 | (Ref(`38)) | 3 ]
+    [ IO[38].D[22].P | B[17] | 38 | (Ref(`38)) | 3 ]
+    [ IO[38].D[22].N | A[16] | 38 | (Ref(`38)) | 3 ]
+    [ IO[38].D[23].P | C[15] | 38 | (Ref(`38)) | 3 ]
+    [ IO[38].D[23].N | B[15] | 38 | (Ref(`38)) | 3 ]
+    [ IO[38].D[24].P | B[18] | 38 | (Ref(`38)) | 3 ]
+    [ IO[38].D[24].N | A[18] | 38 | (Ref(`38)) | 3 ]
+    [ IO[38].S[25] | G[18] | 38 | (Ref(`38)) | - ]
+    [ IO[39].S[0] | H[13] | 39 | (Ref(`39)) | - ]
+    [ IO[39].D[1].P | A[9] | 39 | (Ref(`39)) | 0 ]
+    [ IO[39].D[1].N | A[8] | 39 | (Ref(`39)) | 0 ]
+    [ IO[39].D[2].P | A[11] | 39 | (Ref(`39)) | 0 ]
+    [ IO[39].D[2].N | A[10] | 39 | (Ref(`39)) | 0 ]
+    [ IO[39].D[3].P | C[9] | 39 | (Ref(`39)) | 0 ]
+    [ IO[39].D[3].N | B[8] | 39 | (Ref(`39)) | 0 ]
+    [ IO[39].D[4].P | B[11] | 39 | (Ref(`39)) | 0 ]
+    [ IO[39].D[4].N | B[10] | 39 | (Ref(`39)) | 0 ]
+    [ IO[39].D[5].P | D[9] | 39 | (Ref(`39)) | 0 ]
+    [ IO[39].D[5].N | C[8] | 39 | (Ref(`39)) | 0 ]
+    [ IO[39].D[6].P | C[12] | 39 | (Ref(`39)) | 0 ]
+    [ IO[39].D[6].N | B[12] | 39 | (Ref(`39)) | 0 ]
+    [ IO[39].D[7].P | E[9] | 39 | (Ref(`39)) | 1 ]
+    [ IO[39].D[7].N | E[8] | 39 | (Ref(`39)) | 1 ]
+    [ IO[39].D[8].P | E[12] | 39 | (Ref(`39)) | 1 ]
+    [ IO[39].D[8].N | D[12] | 39 | (Ref(`39)) | 1 ]
+    [ IO[39].D[9].P | F[9] | 39 | (Ref(`39)) | 1 ]
+    [ IO[39].D[9].N | F[8] | 39 | (Ref(`39)) | 1 ]
+    [ IO[39].D[10].P | D[10] | 39 | (Ref(`39)) | 1 ]
+    [ IO[39].D[10].N | C[10] | 39 | (Ref(`39)) | 1 ]
+    [ IO[39].D[11].P | E[11] | 39 | (Ref(`39)) | 1 ]
+    [ IO[39].D[11].N | D[11] | 39 | (Ref(`39)) | 1 ]
+    [ IO[39].D[12].P | F[11] | 39 | (Ref(`39)) | 1 ]
+    [ IO[39].D[12].N | F[10] | 39 | (Ref(`39)) | 1 ]
+    [ IO[39].D[13].P | G[11] | 39 | (Ref(`39)) | 2 ]
+    [ IO[39].D[13].N | G[10] | 39 | (Ref(`39)) | 2 ]
+    [ IO[39].D[14].P | H[10] | 39 | (Ref(`39)) | 2 ]
+    [ IO[39].D[14].N | H[9] | 39 | (Ref(`39)) | 2 ]
+    [ IO[39].D[15].P | J[10] | 39 | (Ref(`39)) | 2 ]
+    [ IO[39].D[15].N | J[9] | 39 | (Ref(`39)) | 2 ]
+    [ IO[39].D[16].P | H[12] | 39 | (Ref(`39)) | 2 ]
+    [ IO[39].D[16].N | G[12] | 39 | (Ref(`39)) | 2 ]
+    [ IO[39].D[17].P | K[11] | 39 | (Ref(`39)) | 2 ]
+    [ IO[39].D[17].N | J[11] | 39 | (Ref(`39)) | 2 ]
+    [ IO[39].D[18].P | H[8] | 39 | (Ref(`39)) | 2 ]
+    [ IO[39].D[18].N | G[8] | 39 | (Ref(`39)) | 2 ]
+    [ IO[39].D[19].P | K[12] | 39 | (Ref(`39)) | 3 ]
+    [ IO[39].D[19].N | J[12] | 39 | (Ref(`39)) | 3 ]
+    [ IO[39].D[20].P | L[9] | 39 | (Ref(`39)) | 3 ]
+    [ IO[39].D[20].N | K[9] | 39 | (Ref(`39)) | 3 ]
+    [ IO[39].D[21].P | L[13] | 39 | (Ref(`39)) | 3 ]
+    [ IO[39].D[21].N | K[13] | 39 | (Ref(`39)) | 3 ]
+    [ IO[39].D[22].P | M[10] | 39 | (Ref(`39)) | 3 ]
+    [ IO[39].D[22].N | L[10] | 39 | (Ref(`39)) | 3 ]
+    [ IO[39].D[23].P | M[13] | 39 | (Ref(`39)) | 3 ]
+    [ IO[39].D[23].N | M[12] | 39 | (Ref(`39)) | 3 ]
+    [ IO[39].D[24].P | M[11] | 39 | (Ref(`39)) | 3 ]
+    [ IO[39].D[24].N | L[11] | 39 | (Ref(`39)) | 3 ]
+    [ IO[39].S[25] | K[8] | 39 | (Ref(`39)) | - ]
+    [ IO[14].S[0] | AF[25] | 14 | (Ref(`14)) | - ]
+    [ IO[14].D[1].P | AN[33] | 14 | (Ref(`14)) | 0 ]
+    [ IO[14].D[1].N | AN[34] | 14 | (Ref(`14)) | 0 ]
+    [ IO[14].D[2].P | AK[34] | 14 | (Ref(`14)) | 0 ]
+    [ IO[14].D[2].N | AL[34] | 14 | (Ref(`14)) | 0 ]
+    [ IO[14].D[3].P | AP[32] | 14 | (Ref(`14)) | 0 ]
+    [ IO[14].D[3].N | AP[33] | 14 | (Ref(`14)) | 0 ]
+    [ IO[14].D[4].P | AK[32] | 14 | (Ref(`14)) | 0 ]
+    [ IO[14].D[4].N | AK[33] | 14 | (Ref(`14)) | 0 ]
+    [ IO[14].D[5].P | AM[32] | 14 | (Ref(`14)) | 0 ]
+    [ IO[14].D[5].N | AN[32] | 14 | (Ref(`14)) | 0 ]
+    [ IO[14].D[6].P | AL[33] | 14 | (Ref(`14)) | 0 ]
+    [ IO[14].D[6].N | AM[33] | 14 | (Ref(`14)) | 0 ]
+    [ IO[14].D[7].P | AP[30] | 14 | (Ref(`14)) | 1 ]
+    [ IO[14].D[7].N | AP[31] | 14 | (Ref(`14)) | 1 ]
+    [ IO[14].D[8].P | AJ[30] | 14 | (Ref(`14)) | 1 ]
+    [ IO[14].D[8].N | AK[31] | 14 | (Ref(`14)) | 1 ]
+    [ IO[14].D[9].P | AM[30] | 14 | (Ref(`14)) | 1 ]
+    [ IO[14].D[9].N | AN[30] | 14 | (Ref(`14)) | 1 ]
+    [ IO[14].D[10].P | AJ[29] | 14 | (Ref(`14)) | 1 ]
+    [ IO[14].D[10].N | AK[29] | 14 | (Ref(`14)) | 1 ]
+    [ IO[14].D[11].P | AL[31] | 14 | (Ref(`14)) | 1 ]
+    [ IO[14].D[11].N | AM[31] | 14 | (Ref(`14)) | 1 ]
+    [ IO[14].D[12].P | AL[29] | 14 | (Ref(`14)) | 1 ]
+    [ IO[14].D[12].N | AL[30] | 14 | (Ref(`14)) | 1 ]
+    [ IO[14].D[13].P | AK[28] | 14 | (Ref(`14)) | 2 ]
+    [ IO[14].D[13].N | AL[28] | 14 | (Ref(`14)) | 2 ]
+    [ IO[14].D[14].P | AK[26] | 14 | (Ref(`14)) | 2 ]
+    [ IO[14].D[14].N | AK[27] | 14 | (Ref(`14)) | 2 ]
+    [ IO[14].D[15].P | AJ[26] | 14 | (Ref(`14)) | 2 ]
+    [ IO[14].D[15].N | AJ[27] | 14 | (Ref(`14)) | 2 ]
+    [ IO[14].D[16].P | AG[25] | 14 | (Ref(`14)) | 2 ]
+    [ IO[14].D[16].N | AH[25] | 14 | (Ref(`14)) | 2 ]
+    [ IO[14].D[17].P | AH[24] | 14 | (Ref(`14)) | 2 ]
+    [ IO[14].D[17].N | AJ[25] | 14 | (Ref(`14)) | 2 ]
+    [ IO[14].D[18].P | AL[25] | 14 | (Ref(`14)) | 2 ]
+    [ IO[14].D[18].N | AL[26] | 14 | (Ref(`14)) | 2 ]
+    [ IO[14].D[19].P | AM[26] | 14 | (Ref(`14)) | 3 ]
+    [ IO[14].D[19].N | AM[27] | 14 | (Ref(`14)) | 3 ]
+    [ IO[14].D[20].P | AN[29] | 14 | (Ref(`14)) | 3 ]
+    [ IO[14].D[20].N | AP[29] | 14 | (Ref(`14)) | 3 ]
+    [ IO[14].D[21].P | AM[25] | 14 | (Ref(`14)) | 3 ]
+    [ IO[14].D[21].N | AN[25] | 14 | (Ref(`14)) | 3 ]
+    [ IO[14].D[22].P | AM[28] | 14 | (Ref(`14)) | 3 ]
+    [ IO[14].D[22].N | AN[28] | 14 | (Ref(`14)) | 3 ]
+    [ IO[14].D[23].P | AP[25] | 14 | (Ref(`14)) | 3 ]
+    [ IO[14].D[23].N | AP[26] | 14 | (Ref(`14)) | 3 ]
+    [ IO[14].D[24].P | AN[27] | 14 | (Ref(`14)) | 3 ]
+    [ IO[14].D[24].N | AP[27] | 14 | (Ref(`14)) | 3 ]
+    [ IO[14].S[25] | AF[24] | 14 | (Ref(`14)) | - ]
+    [ IO[15].S[0] | AC[27] | 15 | (Ref(`15)) | - ]
+    [ IO[15].D[1].P | AF[33] | 15 | (Ref(`15)) | 0 ]
+    [ IO[15].D[1].N | AF[34] | 15 | (Ref(`15)) | 0 ]
+    [ IO[15].D[2].P | AD[34] | 15 | (Ref(`15)) | 0 ]
+    [ IO[15].D[2].N | AE[34] | 15 | (Ref(`15)) | 0 ]
+    [ IO[15].D[3].P | AG[32] | 15 | (Ref(`15)) | 0 ]
+    [ IO[15].D[3].N | AH[32] | 15 | (Ref(`15)) | 0 ]
+    [ IO[15].D[4].P | AH[34] | 15 | (Ref(`15)) | 0 ]
+    [ IO[15].D[4].N | AJ[34] | 15 | (Ref(`15)) | 0 ]
+    [ IO[15].D[5].P | AJ[31] | 15 | (Ref(`15)) | 0 ]
+    [ IO[15].D[5].N | AJ[32] | 15 | (Ref(`15)) | 0 ]
+    [ IO[15].D[6].P | AG[33] | 15 | (Ref(`15)) | 0 ]
+    [ IO[15].D[6].N | AH[33] | 15 | (Ref(`15)) | 0 ]
+    [ IO[15].D[7].P | AE[32] | 15 | (Ref(`15)) | 1 ]
+    [ IO[15].D[7].N | AE[33] | 15 | (Ref(`15)) | 1 ]
+    [ IO[15].D[8].P | AC[30] | 15 | (Ref(`15)) | 1 ]
+    [ IO[15].D[8].N | AD[30] | 15 | (Ref(`15)) | 1 ]
+    [ IO[15].D[9].P | AG[30] | 15 | (Ref(`15)) | 1 ]
+    [ IO[15].D[9].N | AH[30] | 15 | (Ref(`15)) | 1 ]
+    [ IO[15].D[10].P | AD[31] | 15 | (Ref(`15)) | 1 ]
+    [ IO[15].D[10].N | AD[32] | 15 | (Ref(`15)) | 1 ]
+    [ IO[15].D[11].P | AF[30] | 15 | (Ref(`15)) | 1 ]
+    [ IO[15].D[11].N | AG[31] | 15 | (Ref(`15)) | 1 ]
+    [ IO[15].D[12].P | AE[31] | 15 | (Ref(`15)) | 1 ]
+    [ IO[15].D[12].N | AF[31] | 15 | (Ref(`15)) | 1 ]
+    [ IO[15].D[13].P | AD[29] | 15 | (Ref(`15)) | 2 ]
+    [ IO[15].D[13].N | AE[29] | 15 | (Ref(`15)) | 2 ]
+    [ IO[15].D[14].P | AE[28] | 15 | (Ref(`15)) | 2 ]
+    [ IO[15].D[14].N | AF[29] | 15 | (Ref(`15)) | 2 ]
+    [ IO[15].D[15].P | AC[28] | 15 | (Ref(`15)) | 2 ]
+    [ IO[15].D[15].N | AC[29] | 15 | (Ref(`15)) | 2 ]
+    [ IO[15].D[16].P | AE[27] | 15 | (Ref(`15)) | 2 ]
+    [ IO[15].D[16].N | AF[28] | 15 | (Ref(`15)) | 2 ]
+    [ IO[15].D[17].P | AG[28] | 15 | (Ref(`15)) | 2 ]
+    [ IO[15].D[17].N | AH[29] | 15 | (Ref(`15)) | 2 ]
+    [ IO[15].D[18].P | AH[27] | 15 | (Ref(`15)) | 2 ]
+    [ IO[15].D[18].N | AH[28] | 15 | (Ref(`15)) | 2 ]
+    [ IO[15].D[19].P | AD[26] | 15 | (Ref(`15)) | 3 ]
+    [ IO[15].D[19].N | AD[27] | 15 | (Ref(`15)) | 3 ]
+    [ IO[15].D[20].P | AG[26] | 15 | (Ref(`15)) | 3 ]
+    [ IO[15].D[20].N | AG[27] | 15 | (Ref(`15)) | 3 ]
+    [ IO[15].D[21].P | AE[26] | 15 | (Ref(`15)) | 3 ]
+    [ IO[15].D[21].N | AF[26] | 15 | (Ref(`15)) | 3 ]
+    [ IO[15].D[22].P | AE[23] | 15 | (Ref(`15)) | 3 ]
+    [ IO[15].D[22].N | AE[24] | 15 | (Ref(`15)) | 3 ]
+    [ IO[15].D[23].P | AC[25] | 15 | (Ref(`15)) | 3 ]
+    [ IO[15].D[23].N | AD[25] | 15 | (Ref(`15)) | 3 ]
+    [ IO[15].D[24].P | AC[24] | 15 | (Ref(`15)) | 3 ]
+    [ IO[15].D[24].N | AD[24] | 15 | (Ref(`15)) | 3 ]
+    [ IO[15].S[25] | AC[23] | 15 | (Ref(`15)) | - ]
+    [ IO[16].S[0] | V[23] | 16 | (Ref(`16)) | - ]
+    [ IO[16].D[1].P | AA[33] | 16 | (Ref(`16)) | 0 ]
+    [ IO[16].D[1].N | AA[34] | 16 | (Ref(`16)) | 0 ]
+    [ IO[16].D[2].P | V[34] | 16 | (Ref(`16)) | 0 ]
+    [ IO[16].D[2].N | W[34] | 16 | (Ref(`16)) | 0 ]
+    [ IO[16].D[3].P | AB[33] | 16 | (Ref(`16)) | 0 ]
+    [ IO[16].D[3].N | AC[34] | 16 | (Ref(`16)) | 0 ]
+    [ IO[16].D[4].P | Y[33] | 16 | (Ref(`16)) | 0 ]
+    [ IO[16].D[4].N | Y[34] | 16 | (Ref(`16)) | 0 ]
+    [ IO[16].D[5].P | AC[32] | 16 | (Ref(`16)) | 0 ]
+    [ IO[16].D[5].N | AC[33] | 16 | (Ref(`16)) | 0 ]
+    [ IO[16].D[6].P | V[32] | 16 | (Ref(`16)) | 0 ]
+    [ IO[16].D[6].N | V[33] | 16 | (Ref(`16)) | 0 ]
+    [ IO[16].D[7].P | AB[31] | 16 | (Ref(`16)) | 1 ]
+    [ IO[16].D[7].N | AB[32] | 16 | (Ref(`16)) | 1 ]
+    [ IO[16].D[8].P | U[30] | 16 | (Ref(`16)) | 1 ]
+    [ IO[16].D[8].N | V[30] | 16 | (Ref(`16)) | 1 ]
+    [ IO[16].D[9].P | AA[30] | 16 | (Ref(`16)) | 1 ]
+    [ IO[16].D[9].N | AB[30] | 16 | (Ref(`16)) | 1 ]
+    [ IO[16].D[10].P | W[32] | 16 | (Ref(`16)) | 1 ]
+    [ IO[16].D[10].N | Y[32] | 16 | (Ref(`16)) | 1 ]
+    [ IO[16].D[11].P | Y[31] | 16 | (Ref(`16)) | 1 ]
+    [ IO[16].D[11].N | AA[31] | 16 | (Ref(`16)) | 1 ]
+    [ IO[16].D[12].P | W[30] | 16 | (Ref(`16)) | 1 ]
+    [ IO[16].D[12].N | W[31] | 16 | (Ref(`16)) | 1 ]
+    [ IO[16].D[13].P | AA[28] | 16 | (Ref(`16)) | 2 ]
+    [ IO[16].D[13].N | AA[29] | 16 | (Ref(`16)) | 2 ]
+    [ IO[16].D[14].P | Y[28] | 16 | (Ref(`16)) | 2 ]
+    [ IO[16].D[14].N | Y[29] | 16 | (Ref(`16)) | 2 ]
+    [ IO[16].D[15].P | V[27] | 16 | (Ref(`16)) | 2 ]
+    [ IO[16].D[15].N | V[28] | 16 | (Ref(`16)) | 2 ]
+    [ IO[16].D[16].P | V[29] | 16 | (Ref(`16)) | 2 ]
+    [ IO[16].D[16].N | W[29] | 16 | (Ref(`16)) | 2 ]
+    [ IO[16].D[17].P | W[26] | 16 | (Ref(`16)) | 2 ]
+    [ IO[16].D[17].N | W[27] | 16 | (Ref(`16)) | 2 ]
+    [ IO[16].D[18].P | AB[27] | 16 | (Ref(`16)) | 2 ]
+    [ IO[16].D[18].N | AB[28] | 16 | (Ref(`16)) | 2 ]
+    [ IO[16].D[19].P | Y[26] | 16 | (Ref(`16)) | 3 ]
+    [ IO[16].D[19].N | Y[27] | 16 | (Ref(`16)) | 3 ]
+    [ IO[16].D[20].P | V[24] | 16 | (Ref(`16)) | 3 ]
+    [ IO[16].D[20].N | V[25] | 16 | (Ref(`16)) | 3 ]
+    [ IO[16].D[21].P | AA[26] | 16 | (Ref(`16)) | 3 ]
+    [ IO[16].D[21].N | AB[26] | 16 | (Ref(`16)) | 3 ]
+    [ IO[16].D[22].P | W[24] | 16 | (Ref(`16)) | 3 ]
+    [ IO[16].D[22].N | W[25] | 16 | (Ref(`16)) | 3 ]
+    [ IO[16].D[23].P | Y[24] | 16 | (Ref(`16)) | 3 ]
+    [ IO[16].D[23].N | AA[25] | 16 | (Ref(`16)) | 3 ]
+    [ IO[16].D[24].P | AA[23] | 16 | (Ref(`16)) | 3 ]
+    [ IO[16].D[24].N | AA[24] | 16 | (Ref(`16)) | 3 ]
+    [ IO[16].S[25] | AB[25] | 16 | (Ref(`16)) | - ]
+    [ IO[17].S[0] | N[23] | 17 | (Ref(`17)) | - ]
+    [ IO[17].D[1].P | N[24] | 17 | (Ref(`17)) | 0 ]
+    [ IO[17].D[1].N | N[25] | 17 | (Ref(`17)) | 0 ]
+    [ IO[17].D[2].P | N[27] | 17 | (Ref(`17)) | 0 ]
+    [ IO[17].D[2].N | N[28] | 17 | (Ref(`17)) | 0 ]
+    [ IO[17].D[3].P | R[23] | 17 | (Ref(`17)) | 0 ]
+    [ IO[17].D[3].N | R[24] | 17 | (Ref(`17)) | 0 ]
+    [ IO[17].D[4].P | P[24] | 17 | (Ref(`17)) | 0 ]
+    [ IO[17].D[4].N | P[25] | 17 | (Ref(`17)) | 0 ]
+    [ IO[17].D[5].P | T[24] | 17 | (Ref(`17)) | 0 ]
+    [ IO[17].D[5].N | T[25] | 17 | (Ref(`17)) | 0 ]
+    [ IO[17].D[6].P | P[26] | 17 | (Ref(`17)) | 0 ]
+    [ IO[17].D[6].N | P[27] | 17 | (Ref(`17)) | 0 ]
+    [ IO[17].D[7].P | N[29] | 17 | (Ref(`17)) | 1 ]
+    [ IO[17].D[7].N | N[30] | 17 | (Ref(`17)) | 1 ]
+    [ IO[17].D[8].P | M[30] | 17 | (Ref(`17)) | 1 ]
+    [ IO[17].D[8].N | M[31] | 17 | (Ref(`17)) | 1 ]
+    [ IO[17].D[9].P | T[31] | 17 | (Ref(`17)) | 1 ]
+    [ IO[17].D[9].N | R[32] | 17 | (Ref(`17)) | 1 ]
+    [ IO[17].D[10].P | U[31] | 17 | (Ref(`17)) | 1 ]
+    [ IO[17].D[10].N | U[32] | 17 | (Ref(`17)) | 1 ]
+    [ IO[17].D[11].P | R[31] | 17 | (Ref(`17)) | 1 ]
+    [ IO[17].D[11].N | P[31] | 17 | (Ref(`17)) | 1 ]
+    [ IO[17].D[12].P | P[29] | 17 | (Ref(`17)) | 1 ]
+    [ IO[17].D[12].N | P[30] | 17 | (Ref(`17)) | 1 ]
+    [ IO[17].D[13].P | R[28] | 17 | (Ref(`17)) | 2 ]
+    [ IO[17].D[13].N | R[29] | 17 | (Ref(`17)) | 2 ]
+    [ IO[17].D[14].P | T[29] | 17 | (Ref(`17)) | 2 ]
+    [ IO[17].D[14].N | T[30] | 17 | (Ref(`17)) | 2 ]
+    [ IO[17].D[15].P | R[26] | 17 | (Ref(`17)) | 2 ]
+    [ IO[17].D[15].N | R[27] | 17 | (Ref(`17)) | 2 ]
+    [ IO[17].D[16].P | U[28] | 17 | (Ref(`17)) | 2 ]
+    [ IO[17].D[16].N | T[28] | 17 | (Ref(`17)) | 2 ]
+    [ IO[17].D[17].P | U[26] | 17 | (Ref(`17)) | 2 ]
+    [ IO[17].D[17].N | U[27] | 17 | (Ref(`17)) | 2 ]
+    [ IO[17].D[18].P | U[25] | 17 | (Ref(`17)) | 2 ]
+    [ IO[17].D[18].N | T[26] | 17 | (Ref(`17)) | 2 ]
+    [ IO[17].D[19].P | P[32] | 17 | (Ref(`17)) | 3 ]
+    [ IO[17].D[19].N | N[32] | 17 | (Ref(`17)) | 3 ]
+    [ IO[17].D[20].P | M[32] | 17 | (Ref(`17)) | 3 ]
+    [ IO[17].D[20].N | M[33] | 17 | (Ref(`17)) | 3 ]
+    [ IO[17].D[21].P | T[33] | 17 | (Ref(`17)) | 3 ]
+    [ IO[17].D[21].N | R[34] | 17 | (Ref(`17)) | 3 ]
+    [ IO[17].D[22].P | N[33] | 17 | (Ref(`17)) | 3 ]
+    [ IO[17].D[22].N | N[34] | 17 | (Ref(`17)) | 3 ]
+    [ IO[17].D[23].P | U[33] | 17 | (Ref(`17)) | 3 ]
+    [ IO[17].D[23].N | T[34] | 17 | (Ref(`17)) | 3 ]
+    [ IO[17].D[24].P | R[33] | 17 | (Ref(`17)) | 3 ]
+    [ IO[17].D[24].N | P[34] | 17 | (Ref(`17)) | 3 ]
+    [ IO[17].S[25] | U[23] | 17 | (Ref(`17)) | - ]
+    [ IO[18].S[0] | H[27] | 18 | (Ref(`18)) | - ]
+    [ IO[18].D[1].P | L[23] | 18 | (Ref(`18)) | 0 ]
+    [ IO[18].D[1].N | K[23] | 18 | (Ref(`18)) | 0 ]
+    [ IO[18].D[2].P | M[27] | 18 | (Ref(`18)) | 0 ]
+    [ IO[18].D[2].N | L[28] | 18 | (Ref(`18)) | 0 ]
+    [ IO[18].D[3].P | L[24] | 18 | (Ref(`18)) | 0 ]
+    [ IO[18].D[3].N | K[24] | 18 | (Ref(`18)) | 0 ]
+    [ IO[18].D[4].P | M[26] | 18 | (Ref(`18)) | 0 ]
+    [ IO[18].D[4].N | L[26] | 18 | (Ref(`18)) | 0 ]
+    [ IO[18].D[5].P | K[26] | 18 | (Ref(`18)) | 0 ]
+    [ IO[18].D[5].N | K[27] | 18 | (Ref(`18)) | 0 ]
+    [ IO[18].D[6].P | M[25] | 18 | (Ref(`18)) | 0 ]
+    [ IO[18].D[6].N | L[25] | 18 | (Ref(`18)) | 0 ]
+    [ IO[18].D[7].P | G[33] | 18 | (Ref(`18)) | 1 ]
+    [ IO[18].D[7].N | F[34] | 18 | (Ref(`18)) | 1 ]
+    [ IO[18].D[8].P | E[32] | 18 | (Ref(`18)) | 1 ]
+    [ IO[18].D[8].N | E[33] | 18 | (Ref(`18)) | 1 ]
+    [ IO[18].D[9].P | F[30] | 18 | (Ref(`18)) | 1 ]
+    [ IO[18].D[9].N | F[31] | 18 | (Ref(`18)) | 1 ]
+    [ IO[18].D[10].P | F[33] | 18 | (Ref(`18)) | 1 ]
+    [ IO[18].D[10].N | E[34] | 18 | (Ref(`18)) | 1 ]
+    [ IO[18].D[11].P | H[32] | 18 | (Ref(`18)) | 1 ]
+    [ IO[18].D[11].N | G[32] | 18 | (Ref(`18)) | 1 ]
+    [ IO[18].D[12].P | G[30] | 18 | (Ref(`18)) | 1 ]
+    [ IO[18].D[12].N | G[31] | 18 | (Ref(`18)) | 1 ]
+    [ IO[18].D[13].P | H[29] | 18 | (Ref(`18)) | 2 ]
+    [ IO[18].D[13].N | H[30] | 18 | (Ref(`18)) | 2 ]
+    [ IO[18].D[14].P | J[30] | 18 | (Ref(`18)) | 2 ]
+    [ IO[18].D[14].N | J[31] | 18 | (Ref(`18)) | 2 ]
+    [ IO[18].D[15].P | J[27] | 18 | (Ref(`18)) | 2 ]
+    [ IO[18].D[15].N | H[28] | 18 | (Ref(`18)) | 2 ]
+    [ IO[18].D[16].P | K[28] | 18 | (Ref(`18)) | 2 ]
+    [ IO[18].D[16].N | J[29] | 18 | (Ref(`18)) | 2 ]
+    [ IO[18].D[17].P | G[28] | 18 | (Ref(`18)) | 2 ]
+    [ IO[18].D[17].N | F[29] | 18 | (Ref(`18)) | 2 ]
+    [ IO[18].D[18].P | L[29] | 18 | (Ref(`18)) | 2 ]
+    [ IO[18].D[18].N | K[29] | 18 | (Ref(`18)) | 2 ]
+    [ IO[18].D[19].P | K[31] | 18 | (Ref(`18)) | 3 ]
+    [ IO[18].D[19].N | J[32] | 18 | (Ref(`18)) | 3 ]
+    [ IO[18].D[20].P | K[32] | 18 | (Ref(`18)) | 3 ]
+    [ IO[18].D[20].N | K[33] | 18 | (Ref(`18)) | 3 ]
+    [ IO[18].D[21].P | H[33] | 18 | (Ref(`18)) | 3 ]
+    [ IO[18].D[21].N | H[34] | 18 | (Ref(`18)) | 3 ]
+    [ IO[18].D[22].P | L[33] | 18 | (Ref(`18)) | 3 ]
+    [ IO[18].D[22].N | L[34] | 18 | (Ref(`18)) | 3 ]
+    [ IO[18].D[23].P | K[34] | 18 | (Ref(`18)) | 3 ]
+    [ IO[18].D[23].N | J[34] | 18 | (Ref(`18)) | 3 ]
+    [ IO[18].D[24].P | L[30] | 18 | (Ref(`18)) | 3 ]
+    [ IO[18].D[24].N | L[31] | 18 | (Ref(`18)) | 3 ]
+    [ IO[18].S[25] | M[28] | 18 | (Ref(`18)) | - ]
+    [ IO[19].S[0] | F[24] | 19 | (Ref(`19)) | - ]
+    [ IO[19].D[1].P | B[31] | 19 | (Ref(`19)) | 0 ]
+    [ IO[19].D[1].N | B[32] | 19 | (Ref(`19)) | 0 ]
+    [ IO[19].D[2].P | D[34] | 19 | (Ref(`19)) | 0 ]
+    [ IO[19].D[2].N | C[34] | 19 | (Ref(`19)) | 0 ]
+    [ IO[19].D[3].P | B[33] | 19 | (Ref(`19)) | 0 ]
+    [ IO[19].D[3].N | A[33] | 19 | (Ref(`19)) | 0 ]
+    [ IO[19].D[4].P | C[33] | 19 | (Ref(`19)) | 0 ]
+    [ IO[19].D[4].N | B[34] | 19 | (Ref(`19)) | 0 ]
+    [ IO[19].D[5].P | E[31] | 19 | (Ref(`19)) | 0 ]
+    [ IO[19].D[5].N | D[31] | 19 | (Ref(`19)) | 0 ]
+    [ IO[19].D[6].P | D[32] | 19 | (Ref(`19)) | 0 ]
+    [ IO[19].D[6].N | C[32] | 19 | (Ref(`19)) | 0 ]
+    [ IO[19].D[7].P | C[25] | 19 | (Ref(`19)) | 1 ]
+    [ IO[19].D[7].N | B[25] | 19 | (Ref(`19)) | 1 ]
+    [ IO[19].D[8].P | A[25] | 19 | (Ref(`19)) | 1 ]
+    [ IO[19].D[8].N | A[26] | 19 | (Ref(`19)) | 1 ]
+    [ IO[19].D[9].P | E[26] | 19 | (Ref(`19)) | 1 ]
+    [ IO[19].D[9].N | D[26] | 19 | (Ref(`19)) | 1 ]
+    [ IO[19].D[10].P | B[26] | 19 | (Ref(`19)) | 1 ]
+    [ IO[19].D[10].N | B[27] | 19 | (Ref(`19)) | 1 ]
+    [ IO[19].D[11].P | E[27] | 19 | (Ref(`19)) | 1 ]
+    [ IO[19].D[11].N | D[27] | 19 | (Ref(`19)) | 1 ]
+    [ IO[19].D[12].P | C[27] | 19 | (Ref(`19)) | 1 ]
+    [ IO[19].D[12].N | B[28] | 19 | (Ref(`19)) | 1 ]
+    [ IO[19].D[13].P | C[30] | 19 | (Ref(`19)) | 2 ]
+    [ IO[19].D[13].N | B[30] | 19 | (Ref(`19)) | 2 ]
+    [ IO[19].D[14].P | C[28] | 19 | (Ref(`19)) | 2 ]
+    [ IO[19].D[14].N | C[29] | 19 | (Ref(`19)) | 2 ]
+    [ IO[19].D[15].P | A[28] | 19 | (Ref(`19)) | 2 ]
+    [ IO[19].D[15].N | A[29] | 19 | (Ref(`19)) | 2 ]
+    [ IO[19].D[16].P | D[29] | 19 | (Ref(`19)) | 2 ]
+    [ IO[19].D[16].N | D[30] | 19 | (Ref(`19)) | 2 ]
+    [ IO[19].D[17].P | A[30] | 19 | (Ref(`19)) | 2 ]
+    [ IO[19].D[17].N | A[31] | 19 | (Ref(`19)) | 2 ]
+    [ IO[19].D[18].P | E[28] | 19 | (Ref(`19)) | 2 ]
+    [ IO[19].D[18].N | E[29] | 19 | (Ref(`19)) | 2 ]
+    [ IO[19].D[19].P | J[24] | 19 | (Ref(`19)) | 3 ]
+    [ IO[19].D[19].N | H[24] | 19 | (Ref(`19)) | 3 ]
+    [ IO[19].D[20].P | J[25] | 19 | (Ref(`19)) | 3 ]
+    [ IO[19].D[20].N | H[25] | 19 | (Ref(`19)) | 3 ]
+    [ IO[19].D[21].P | G[25] | 19 | (Ref(`19)) | 3 ]
+    [ IO[19].D[21].N | F[25] | 19 | (Ref(`19)) | 3 ]
+    [ IO[19].D[22].P | G[26] | 19 | (Ref(`19)) | 3 ]
+    [ IO[19].D[22].N | F[26] | 19 | (Ref(`19)) | 3 ]
+    [ IO[19].D[23].P | E[24] | 19 | (Ref(`19)) | 3 ]
+    [ IO[19].D[23].N | D[25] | 19 | (Ref(`19)) | 3 ]
+    [ IO[19].D[24].P | G[27] | 19 | (Ref(`19)) | 3 ]
+    [ IO[19].D[24].N | F[28] | 19 | (Ref(`19)) | 3 ]
+    [ IO[19].S[25] | J[26] | 19 | (Ref(`19)) | - ]
+  val box = BoxSymbol(self)
+  val unique-sym-banks = HashSet<Ref>()
+  for p in pins(self) do :
+    val sym-bank = property(p.symbol-bank)
+    set-bank(sym-bank, p)
+    add(unique-sym-banks, sym-bank)
+  assign-symbols(seq({_ => box}, unique-sym-banks))
+  assign-landpattern(ffg1157-bga)
+
+public pcb-module module :
+  pin VCCBRAM
+  pin MGTAVCC_G11
+  pin MGTAVCC_G10
+  pin MGTAVTT_G11
+  pin MGTAVTT_G10
+  pin GND
+  pin VCCINT
+  pin VCCAUX
+  pin VCCAUX_IO_G0
+  pin VCCAUX_IO_G1
+  pin VCCAUX_IO_G2
+  pin VCCAUX_IO_G3
+  pin VCCO
+  pin VCCO_14
+  pin VCCO_15
+  pin VCCO_16
+  pin VCCO_17
+  pin VCCO_18
+  pin VCCO_19
+  pin VCCO_34
+  pin VCCO_35
+  pin VCCO_36
+  pin VCCO_37
+  pin VCCO_38
+  pin VCCO_39
+
+  inst comp : component
+
+  for p in pins(comp.VCCBRAM) do :
+    net (VCCBRAM p)
+  for p in pins(comp.MGTAVCC_G11) do :
+    net (MGTAVCC_G11 p)
+  for p in pins(comp.MGTAVCC_G10) do :
+    net (MGTAVCC_G10 p)
+  for p in pins(comp.MGTAVTT_G11) do :
+    net (MGTAVTT_G11 p)
+  for p in pins(comp.MGTAVTT_G10) do :
+    net (MGTAVTT_G10 p)
+  for p in pins(comp.GND) do :
+    net (GND p)
+  for p in pins(comp.VCCINT) do :
+    net (VCCINT p)
+  for p in pins(comp.VCCAUX) do :
+    net (VCCAUX p)
+  for p in pins(comp.VCCAUX_IO_G0) do :
+    net (VCCAUX_IO_G0 p)
+  for p in pins(comp.VCCAUX_IO_G1) do :
+    net (VCCAUX_IO_G1 p)
+  for p in pins(comp.VCCAUX_IO_G2) do :
+    net (VCCAUX_IO_G2 p)
+  for p in pins(comp.VCCAUX_IO_G3) do :
+    net (VCCAUX_IO_G3 p)
+  for p in pins(comp.VCCO) do :
+    net (VCCO p)
+  for p in pins(comp.VCCO_14) do :
+    net (VCCO_14 p)
+  for p in pins(comp.VCCO_15) do :
+    net (VCCO_15 p)
+  for p in pins(comp.VCCO_16) do :
+    net (VCCO_16 p)
+  for p in pins(comp.VCCO_17) do :
+    net (VCCO_17 p)
+  for p in pins(comp.VCCO_18) do :
+    net (VCCO_18 p)
+  for p in pins(comp.VCCO_19) do :
+    net (VCCO_19 p)
+  for p in pins(comp.VCCO_34) do :
+    net (VCCO_34 p)
+  for p in pins(comp.VCCO_35) do :
+    net (VCCO_35 p)
+  for p in pins(comp.VCCO_36) do :
+    net (VCCO_36 p)
+  for p in pins(comp.VCCO_37) do :
+    net (VCCO_37 p)
+  for p in pins(comp.VCCO_38) do :
+    net (VCCO_38 p)
+  for p in pins(comp.VCCO_39) do :
+    net (VCCO_39 p)
+
+  make-supports(comp)
+
+defn make-supports (comp) :
+  inside pcb-module :
+    for bank in cat-all([14 to 20, 34 to 40]) do :
+      supports gpio :
+        gpio.gpio => comp.IO[bank].S[0]
+      for channel in 1 through 24 do :
+        supports virtex-7-diff-gpio :
+          virtex-7-diff-gpio.D.P => comp.IO[bank].D[channel].P
+          virtex-7-diff-gpio.D.N => comp.IO[bank].D[channel].N
+      supports gpio :
+        gpio.gpio => comp.IO[bank].S[25]
+    supports virtex-7-config-data-bus(8) :
+      virtex-7-config-data-bus(8).D[0] => comp.IO[14].D[1].P
+      virtex-7-config-data-bus(8).D[1] => comp.IO[14].D[1].N
+      virtex-7-config-data-bus(8).D[2] => comp.IO[14].D[2].P
+      virtex-7-config-data-bus(8).D[3] => comp.IO[14].D[2].N
+      virtex-7-config-data-bus(8).D[4] => comp.IO[14].D[4].P
+      virtex-7-config-data-bus(8).D[5] => comp.IO[14].D[4].N
+      virtex-7-config-data-bus(8).D[6] => comp.IO[14].D[5].P
+      virtex-7-config-data-bus(8).D[7] => comp.IO[14].D[5].N
+    supports virtex-7-config-data-bus(16) :
+      virtex-7-config-data-bus(16).D[0] => comp.IO[14].D[1].P
+      virtex-7-config-data-bus(16).D[1] => comp.IO[14].D[1].N
+      virtex-7-config-data-bus(16).D[2] => comp.IO[14].D[2].P
+      virtex-7-config-data-bus(16).D[3] => comp.IO[14].D[2].N
+      virtex-7-config-data-bus(16).D[4] => comp.IO[14].D[4].P
+      virtex-7-config-data-bus(16).D[5] => comp.IO[14].D[4].N
+      virtex-7-config-data-bus(16).D[6] => comp.IO[14].D[5].P
+      virtex-7-config-data-bus(16).D[7] => comp.IO[14].D[5].N
+      virtex-7-config-data-bus(16).D[8] => comp.IO[14].D[6].N
+      virtex-7-config-data-bus(16).D[9] => comp.IO[14].D[7].P
+      virtex-7-config-data-bus(16).D[10] => comp.IO[14].D[7].N
+      virtex-7-config-data-bus(16).D[11] => comp.IO[14].D[8].P
+      virtex-7-config-data-bus(16).D[12] => comp.IO[14].D[8].N
+      virtex-7-config-data-bus(16).D[13] => comp.IO[14].D[9].N
+      virtex-7-config-data-bus(16).D[14] => comp.IO[14].D[10].P
+      virtex-7-config-data-bus(16).D[15] => comp.IO[14].D[10].N
+    supports virtex-7-config-data-bus(32) :
+      virtex-7-config-data-bus(32).D[0] => comp.IO[14].D[1].P
+      virtex-7-config-data-bus(32).D[1] => comp.IO[14].D[1].N
+      virtex-7-config-data-bus(32).D[2] => comp.IO[14].D[2].P
+      virtex-7-config-data-bus(32).D[3] => comp.IO[14].D[2].N
+      virtex-7-config-data-bus(32).D[4] => comp.IO[14].D[4].P
+      virtex-7-config-data-bus(32).D[5] => comp.IO[14].D[4].N
+      virtex-7-config-data-bus(32).D[6] => comp.IO[14].D[5].P
+      virtex-7-config-data-bus(32).D[7] => comp.IO[14].D[5].N
+      virtex-7-config-data-bus(32).D[8] => comp.IO[14].D[6].N
+      virtex-7-config-data-bus(32).D[9] => comp.IO[14].D[7].P
+      virtex-7-config-data-bus(32).D[10] => comp.IO[14].D[7].N
+      virtex-7-config-data-bus(32).D[11] => comp.IO[14].D[8].P
+      virtex-7-config-data-bus(32).D[12] => comp.IO[14].D[8].N
+      virtex-7-config-data-bus(32).D[13] => comp.IO[14].D[9].N
+      virtex-7-config-data-bus(32).D[14] => comp.IO[14].D[10].P
+      virtex-7-config-data-bus(32).D[15] => comp.IO[14].D[10].N
+      virtex-7-config-data-bus(32).D[16] => comp.IO[14].D[24].N
+      virtex-7-config-data-bus(32).D[17] => comp.IO[14].D[24].P
+      virtex-7-config-data-bus(32).D[18] => comp.IO[14].D[23].N
+      virtex-7-config-data-bus(32).D[19] => comp.IO[14].D[23].P
+      virtex-7-config-data-bus(32).D[20] => comp.IO[14].D[22].N
+      virtex-7-config-data-bus(32).D[21] => comp.IO[14].D[22].P
+      virtex-7-config-data-bus(32).D[22] => comp.IO[14].D[21].N
+      virtex-7-config-data-bus(32).D[23] => comp.IO[14].D[20].N
+      virtex-7-config-data-bus(32).D[24] => comp.IO[14].D[20].P
+      virtex-7-config-data-bus(32).D[25] => comp.IO[14].D[19].N
+      virtex-7-config-data-bus(32).D[26] => comp.IO[14].D[19].P
+      virtex-7-config-data-bus(32).D[27] => comp.IO[14].D[18].N
+      virtex-7-config-data-bus(32).D[28] => comp.IO[14].D[18].P
+      virtex-7-config-data-bus(32).D[29] => comp.IO[14].D[17].N
+      virtex-7-config-data-bus(32).D[30] => comp.IO[14].D[17].P
+      virtex-7-config-data-bus(32).D[31] => comp.IO[14].D[16].N
+    supports virtex-7-serial-config-data :
+      virtex-7-serial-config-data.DOUT => comp.IO[14].D[15].N
+      virtex-7-serial-config-data.DIN => comp.IO[14].D[1].N
+    supports virtex-7-spi :
+      virtex-7-spi.DOUT => comp.IO[14].D[15].N
+      virtex-7-spi.FCS => comp.IO[14].D[6].P
+      virtex-7-spi.MOSI => comp.IO[14].D[1].P
+      virtex-7-spi.DIN => comp.IO[14].D[1].N
+    supports virtex-7-select-map-control :
+      virtex-7-select-map-control.CSI => comp.IO[14].D[16].P
+      virtex-7-select-map-control.CSO => comp.IO[14].D[15].N
+      virtex-7-select-map-control.RDWR => comp.IO[14].D[15].P
+    supports virtex-7-bpi-control :
+      virtex-7-bpi-control.ADV => comp.IO[15].D[15].N
+      virtex-7-bpi-control.FCS => comp.IO[14].D[6].P
+      virtex-7-bpi-control.FOE => comp.IO[15].D[23].P
+      virtex-7-bpi-control.FWE => comp.IO[15].D[23].N
+    supports virtex-7-bpi-address :
+      virtex-7-bpi-address.ADDR[0] => comp.IO[14].D[24].N
+      virtex-7-bpi-address.ADDR[1] => comp.IO[14].D[24].P
+      virtex-7-bpi-address.ADDR[2] => comp.IO[14].D[23].N
+      virtex-7-bpi-address.ADDR[3] => comp.IO[14].D[23].P
+      virtex-7-bpi-address.ADDR[4] => comp.IO[14].D[22].N
+      virtex-7-bpi-address.ADDR[5] => comp.IO[14].D[22].P
+      virtex-7-bpi-address.ADDR[6] => comp.IO[14].D[21].N
+      virtex-7-bpi-address.ADDR[7] => comp.IO[14].D[20].N
+      virtex-7-bpi-address.ADDR[8] => comp.IO[14].D[20].P
+      virtex-7-bpi-address.ADDR[9] => comp.IO[14].D[19].N
+      virtex-7-bpi-address.ADDR[10] => comp.IO[14].D[19].P
+      virtex-7-bpi-address.ADDR[11] => comp.IO[14].D[18].N
+      virtex-7-bpi-address.ADDR[12] => comp.IO[14].D[18].P
+      virtex-7-bpi-address.ADDR[13] => comp.IO[14].D[17].N
+      virtex-7-bpi-address.ADDR[14] => comp.IO[14].D[17].P
+      virtex-7-bpi-address.ADDR[15] => comp.IO[14].D[16].N
+      virtex-7-bpi-address.ADDR[16] => comp.IO[15].D[22].N
+      virtex-7-bpi-address.ADDR[17] => comp.IO[15].D[22].P
+      virtex-7-bpi-address.ADDR[18] => comp.IO[15].D[21].N
+      virtex-7-bpi-address.ADDR[19] => comp.IO[15].D[20].N
+      virtex-7-bpi-address.ADDR[20] => comp.IO[15].D[20].P
+      virtex-7-bpi-address.ADDR[21] => comp.IO[15].D[19].N
+      virtex-7-bpi-address.ADDR[22] => comp.IO[15].D[19].P
+      virtex-7-bpi-address.ADDR[23] => comp.IO[15].D[18].N
+      virtex-7-bpi-address.ADDR[24] => comp.IO[15].D[18].P
+      virtex-7-bpi-address.ADDR[25] => comp.IO[15].D[17].N
+      virtex-7-bpi-address.ADDR[26] => comp.IO[15].D[17].P
+      virtex-7-bpi-address.ADDR[27] => comp.IO[15].D[16].N
+      virtex-7-bpi-address.ADDR[28] => comp.IO[15].D[16].P
+    supports virtex-7-pull-up-during-config :
+      virtex-7-pull-up-during-config.PUDC => comp.IO[14].D[3].P
+    supports virtex-7-external-master-clock :
+      virtex-7-external-master-clock.EMCCLK => comp.IO[14].D[3].N
+    supports virtex-7-revision-select :
+      virtex-7-revision-select.RS[0] => comp.IO[15].D[24].N
+      virtex-7-revision-select.RS[1] => comp.IO[15].D[24].P
+    for p in [comp.IO[14].D[6].N, comp.IO[14].D[19].N, comp.IO[15].D[6].N, comp.IO[15].D[19].N, comp.IO[16].D[6].N, comp.IO[16].D[19].N, comp.IO[17].D[6].N, comp.IO[17].D[19].N, comp.IO[18].D[6].N, comp.IO[18].D[19].N, comp.IO[19].D[6].N, comp.IO[19].D[19].N, comp.IO[34].D[6].N, comp.IO[34].D[19].N, comp.IO[35].D[6].N, comp.IO[35].D[19].N, comp.IO[36].D[6].N, comp.IO[36].D[19].N, comp.IO[37].D[6].N, comp.IO[37].D[19].N, comp.IO[38].D[6].N, comp.IO[38].D[19].N, comp.IO[39].D[6].N, comp.IO[39].D[19].N] do :
+      supports virtex-7-vref :
+        virtex-7-vref.VREF => p
+    for bank-and-channel in [[14 11] [14 14] [15 11] [15 14] [16 11] [16 14] [17 11] [17 14] [18 11] [18 14] [19 11] [19 14] [34 11] [34 14] [35 11] [35 14] [36 11] [36 14] [37 11] [37 14] [38 11] [38 14] [39 11] [39 14]] do :
+      val [bank, channel] = bank-and-channel
+      supports virtex-7-single-region-clock :
+        virtex-7-single-region-clock.SRCC => comp.IO[bank].D[channel].P
+      supports virtex-7-single-region-clock :
+        virtex-7-single-region-clock.SRCC => comp.IO[bank].D[channel].N
+    for bank-and-channel in [[14 12] [14 13] [15 12] [15 13] [16 12] [16 13] [17 12] [17 13] [18 12] [18 13] [19 12] [19 13] [34 12] [34 13] [35 12] [35 13] [36 12] [36 13] [37 12] [37 13] [38 12] [38 13] [39 12] [39 13]] do :
+      val [bank, channel] = bank-and-channel
+      supports virtex-7-multi-region-clock :
+        virtex-7-multi-region-clock.MRCC => comp.IO[bank].D[channel].P
+      supports virtex-7-multi-region-clock :
+        virtex-7-multi-region-clock.MRCC => comp.IO[bank].D[channel].N
+    for bank-and-channel in [[15 1] [15 3] [15 7] [15 9] [35 1] [35 3] [35 7] [35 9] [15 2] [15 5] [15 8] [15 10] [35 2] [35 5] [35 8] [35 10]] do :
+      val [bank, channel] = bank-and-channel
+      supports virtex-7-adc :
+        virtex-7-adc.ADC.P => comp.IO[bank].D[channel].P
+        virtex-7-adc.ADC.N => comp.IO[bank].D[channel].N
+    for bank in cat-all([14 to 20, 34 to 40]) do :
+      supports virtex-7-dci-vref-n :
+        virtex-7-dci-vref-n.VRN => comp.IO[bank].S[0]
+      supports virtex-7-dci-vref-p :
+        virtex-7-dci-vref-p.VRP => comp.IO[bank].S[25]
+    for bank-and-channel in [[14 3] [14 9] [14 15] [14 21] [15 3] [15 9] [15 15] [15 21] [16 3] [16 9] [16 15] [16 21] [17 3] [17 9] [17 15] [17 21] [18 3] [18 9] [18 15] [18 21] [19 3] [19 9] [19 15] [19 21] [34 3] [34 9] [34 15] [34 21] [35 3] [35 9] [35 15] [35 21] [36 3] [36 9] [36 15] [36 21] [37 3] [37 9] [37 15] [37 21] [38 3] [38 9] [38 15] [38 21] [39 3] [39 9] [39 15] [39 21]] do :
+      val [bank, channel] = bank-and-channel
+      supports virtex-7-memory-strobe :
+        virtex-7-memory-strobe.DQS.P => comp.IO[bank].D[channel].P
+        virtex-7-memory-strobe.DQS.N => comp.IO[bank].D[channel].N
+    for bank in cat-all([14 to 20, 34 to 40]) do :
+      for channel in 1 through 24 do :
+        supports virtex-7-memory-byte-pin :
+          virtex-7-memory-byte-pin.MBP => comp.IO[bank].D[channel].P
+        supports virtex-7-memory-byte-pin :
+          virtex-7-memory-byte-pin.MBP => comp.IO[bank].D[channel].N
+    for bank in cat-all([14 to 20, 34 to 40]) do :
+      for group in 0 to 4 do :
+        defn match-bank-group (p) :
+          (property?(p.bank) == One(bank)) and
+            (property?(p.memory-byte-group) == One(group))
+        supports virtex-7-memory-byte-group :
+          require clk:virtex-7-memory-strobe from self
+          restrict(clk.DQS.P, match-bank-group)
+          virtex-7-memory-byte-group.DQS.P => clk.DQS.P
+          virtex-7-memory-byte-group.DQS.N => clk.DQS.N
+          for i in 0 to 8 do :
+            require p:virtex-7-memory-byte-pin from self
+            restrict(p.MBP, match-bank-group)
+            virtex-7-memory-byte-group.P[i] => p.MBP
+    for bank in cat-all([14 to 20, 34 to 40]) do :
+      defn match-bank (p) :
+        property?(p.bank) == One(bank)
+      supports virtex-7-memory-byte-group-with-vref :
+        require grp:virtex-7-memory-byte-group from self
+        restrict(grp.P[0], match-bank)
+        virtex-7-memory-byte-group-with-vref.G.DQS.P => grp.DQS.P
+        virtex-7-memory-byte-group-with-vref.G.DQS.N => grp.DQS.N
+        for i in 0 to 8 do :
+          virtex-7-memory-byte-group-with-vref.G.P[i] => grp.P[i]
+        require v:virtex-7-vref from self
+        restrict(v.VREF, match-bank)
+        virtex-7-memory-byte-group-with-vref.VREF => v.VREF
