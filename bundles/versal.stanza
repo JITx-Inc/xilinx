@@ -1,0 +1,59 @@
+#use-added-syntax(jitx)
+defpackage bundles/versal :
+  import core
+  import collections
+
+  import jitx
+  import jitx/commands
+
+  import jsl/bundles
+
+public pcb-bundle gtyp-quad :
+  port L : lane-pair[4]
+  port REFCLK : clk-diff-pair[2]
+  ; TODO: enable these when shareable support pins are implemented
+  ; port AVTTRCAL : pin
+  ; port RREF : pin
+
+public pcb-bundle gtyp-mmi-quad :
+  port L : lane-pair[4]
+  port REFCLK : clk-diff-pair[2]
+  ; TODO: enable these when shareable support pins are implemented
+  ; port AVTTRCAL : pin
+  ; port RREF : pin
+
+public pcb-bundle hdio-bank :
+  port L : diff-pair[11]
+  port VCCO : power
+
+public pcb-bundle pmc-mio-bank :
+  port P : pin[26]
+  port VCCO : power
+
+public pcb-bundle lpd-mio-bank :
+  port P : pin[26]
+  port VCCO : power
+
+public pcb-bundle x5io-bank :
+  port L : diff-pair[16]
+  port VCCO : power
+  ; TODO: enable these when shareable support pins are implemented
+  ; port AVTTRCAL : pin
+  ; port RREF : pin
+
+public pcb-bundle mipi-phy :
+  port REFCLK : clk-diff-pair
+  port RESREF : pin
+  port L : lane-pair[2]
+  ; analog power
+  port VCCIO : power
+  ; digital power
+  port VCC : power
+
+public pcb-bundle gtr-usb3 :
+  port REFCLK : clk-diff-pair
+  port RESREF : pin
+  port TX : diff-pair[[0, 3]]
+  port TXRX: diff-pair[[1, 2]]
+  port VCCIO : power
+  port VCC : power

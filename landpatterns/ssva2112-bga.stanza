@@ -1,0 +1,36 @@
+#use-added-syntax(jitx)
+defpackage landpatterns/ssva2112-bga :
+  import core
+  import jitx
+  import jitx/commands
+
+  import jsl/design/settings
+  import jsl/landpatterns
+  import jsl/landpatterns/BGA/pads
+  import jsl/landpatterns/pad-planner
+  import jsl/landpatterns/pad-island
+
+; Xilinx SSVA2112
+; https://docs.amd.com/r/en-US/am013-versal-pkg-pinout/Package-and-Pinout-Overview
+
+val NUM_ROWS = 46
+val NUM_COLS = 46
+
+public val ssva2112-bga = create-landpattern $
+  new BGA :
+    defmethod num-leads (this) : NUM_ROWS * NUM_COLS
+    defmethod lead-diam (this) : 0.5
+    defmethod density-level (this) : DensityLevelC
+    defmethod pad-planner (this) :
+      Corner-Cut-Matrix-Planner(
+        rows = NUM_ROWS,
+        columns = NUM_COLS,
+        corner-cut = 1,
+        pitch = 0.8)
+    defmethod lead-numbering (this) :
+      Grid-Numbering(NUM_ROWS, NUM_COLS)
+    defmethod package-body (this) :
+      PackageBody(
+        width = typ(37.5),
+        length = typ(37.5),
+        height = min-typ-max(3.50, 3.70, 3.90))
