@@ -2515,23 +2515,7 @@ defn make-usb-supports () :
     support(usb-2-connector, self.USB2)
     support(gtr-usb3, self.USB3)
 
-doc: \<DOC>
-@brief LPDDR5 32-bit rank 2 bundle
-Represents the complete LPDDR5 memory interface
-@member d Data lanes (2 lanes per channel)
-@member cs Chip select
-@member ck Command clock
-@member ca Command/Address bus (7 bits)
-@member reset_n Reset signal (shared across all channels)
-<DOC>
-public pcb-bundle lpddr5x32r2 :
-  val width = LPDDR5-x32
-  val rank = LPDDR5-DualRank
-  port d : lpddr5-data-lane[num-channels(width)][2]
-  port cs : pin[num-channels(width)][rank-to-int(rank)]
-  port ck : diff-pair[num-channels(width)]
-  port ca : pin[num-channels(width)][7]
-  port reset_n : pin
+public val lpddr5x32r2 = lpddr5(LPDDR5-x32, LPDDR5-DualRank)
 
 defn make-lpddr5-supports () :
   ;make-lpddr5-default-supports()
