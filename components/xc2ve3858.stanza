@@ -29,6 +29,8 @@ val X5IO_MC_LOOKUP = to-inttable<[Int,Int]>([
   710 => [2, 0], 711 => [2, 1], 712 => [2, 2],
   713 => [3, 3], 714 => [3, 4], 715 => [3, 5],
 ])
+; lowest bank number for each DDRMC bank triplet
+val X5IO_DDRMC_BASE_BANKS = [700, 703, 707, 710, 713]
 
 protected pcb-component component :
   pin-properties :
@@ -2533,14 +2535,15 @@ public pcb-bundle lpddr5x32r2 :
 
 defn make-lpddr5-supports () :
   ;make-lpddr5-default-supports()
-  make-lpddr5-packed-left-supports()
+  for base-bank in X5IO_DDRMC_BASE_BANKS do :
+    make-lpddr5-packed-left-supports(base-bank)
   ;make-lpddr5-packed-right-supports()
 
-defn make-lpddr5-packed-left-supports () :
+defn make-lpddr5-packed-left-supports (base-bank:Int) :
   inside pcb-module :
-    val bank0 = self.IO_X5[700]
-    val bank1 = self.IO_X5[701]
-    val bank2 = self.IO_X5[702]
+    val bank0 = self.IO_X5[base-bank]
+    val bank1 = self.IO_X5[base-bank + 1]
+    val bank2 = self.IO_X5[base-bank + 2]
 
     pcb-bundle y0-dq-bit :
       port p
