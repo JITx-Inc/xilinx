@@ -2464,23 +2464,208 @@ protected pcb-module module :
   make-supports()
 
 defn make-supports () :
+  make-gtyp-supports()
+  make-hdio-supports()
+  make-pmc-mio-supports()
+  make-lpd-mio-supports()
+  make-mipi-supports()
+  make-x5io-supports()
+  make-usb-supports()
+  make-lpddr5-supports()
+
+defn make-gtyp-supports () :
   inside pcb-module :
     for bank in GTYP_BANKS do :
       support(gtyp-quad, self.GTYP[bank])
+      for i in 0 to 4 do :
+        support(diff-pair, self.GTYP[bank].L[i].TX)
+        support(diff-pair, self.GTYP[bank].L[i].RX)
     for bank in GTYP_MMI_BANKS do :
       support(gtyp-mmi-quad, self.GTYP[bank])
+
+defn make-hdio-supports () :
+  inside pcb-module :
     for bank in HDIO_BANKS do :
       support(hdio-bank, self.IO_HD[bank])
+
+defn make-pmc-mio-supports () :
+  inside pcb-module :
     for bank in PMC_MIO_BANKS do :
       support(pmc-mio-bank, self.PMC_MIO[bank])
+
+defn make-lpd-mio-supports () :
+  inside pcb-module :
     for bank in LPD_MIO_BANKS do :
       support(lpd-mio-bank, self.LPD_MIO[bank])
+
+defn make-mipi-supports () :
+  inside pcb-module :
     for bank in MIPI_BANKS do :
       support(mipi-phy, self.MIPI[bank])
+
+defn make-x5io-supports () :
+  inside pcb-module :
     for bank in X5IO_BANKS do :
       support(x5io-bank, self.IO_X5[bank])
+
+defn make-usb-supports () :
+  inside pcb-module :
     support(usb-2-connector, self.USB2)
     support(gtr-usb3, self.USB3)
+
+doc: \<DOC>
+@brief LPDDR5 32-bit rank 2 bundle
+Represents the complete LPDDR5 memory interface
+@member d Data lanes (2 lanes per channel)
+@member cs Chip select
+@member ck Command clock
+@member ca Command/Address bus (7 bits)
+@member reset_n Reset signal (shared across all channels)
+<DOC>
+public pcb-bundle lpddr5x32r2 :
+  val width = LPDDR5-x32
+  val rank = LPDDR5-DualRank
+  port d : lpddr5-data-lane[num-channels(width)][2]
+  port cs : pin[num-channels(width)][rank-to-int(rank)]
+  port ck : diff-pair[num-channels(width)]
+  port ca : pin[num-channels(width)][7]
+  port reset_n : pin
+
+defn make-lpddr5-supports () :
+  ;make-lpddr5-default-supports()
+  make-lpddr5-packed-left-supports()
+  ;make-lpddr5-packed-right-supports()
+
+defn make-lpddr5-packed-left-supports () :
+  inside pcb-module :
+    val bank0 = self.IO_X5[700]
+    val bank1 = self.IO_X5[701]
+    val bank2 = self.IO_X5[702]
+
+    pcb-bundle y0-dq-bit :
+      port p
+    for lane in [0, 2, 4, 6] do :
+      support-single(y0-dq-bit, bank0.L[lane].P)
+      support-single(y0-dq-bit, bank0.L[lane].N)
+
+    pcb-bundle y1-dq-bit :
+      port p
+    for lane in [8, 10, 12, 14] do :
+      support-single(y1-dq-bit, bank0.L[lane].P)
+      support-single(y1-dq-bit, bank0.L[lane].N)
+
+    pcb-bundle y2-dq-bit :
+      port p
+    for lane in [0, 2, 4, 6] do :
+      support-single(y2-dq-bit, bank1.L[lane].P)
+      support-single(y2-dq-bit, bank1.L[lane].N)
+
+    pcb-bundle y3-dq-bit :
+      port p
+    for lane in [8, 10, 12, 14] do :
+      support-single(y3-dq-bit, bank1.L[lane].P)
+      support-single(y3-dq-bit, bank1.L[lane].N)
+
+    pcb-bundle c0-lane :
+      port d : pin[8]
+      port dmi : pin
+      port wck : diff-pair
+      port rdqs : diff-pair
+
+    supports c0-lane :
+      for i in 0 to 8 do :
+        require b : y0-dq-bit
+        c0-lane.d[i] => b.p
+      c0-lane.dmi => bank0.L[3].P
+      c0-lane.wck.P => bank0.L[1].P
+      c0-lane.wck.N => bank0.L[1].N
+      c0-lane.rdqs.P => bank0.L[5].P
+      c0-lane.rdqs.N => bank0.L[5].N
+
+    supports c0-lane :
+      for i in 0 to 8 do :
+        require b : y1-dq-bit
+        c0-lane.d[i] => b.p
+      c0-lane.dmi => bank0.L[11].P
+      c0-lane.wck.P => bank0.L[9].P
+      c0-lane.wck.N => bank0.L[9].N
+      c0-lane.rdqs.P => bank0.L[13].P
+      c0-lane.rdqs.N => bank0.L[13].N
+
+    pcb-bundle c1-lane :
+      port d : pin[8]
+      port dmi : pin
+      port wck : diff-pair
+      port rdqs : diff-pair
+
+    supports c1-lane :
+      for i in 0 to 8 do :
+        require b : y2-dq-bit
+        c1-lane.d[i] => b.p
+      c1-lane.dmi => bank1.L[7].P
+      c1-lane.wck.P => bank1.L[5].P
+      c1-lane.wck.N => bank1.L[5].N
+      c1-lane.rdqs.P => bank1.L[1].P
+      c1-lane.rdqs.N => bank1.L[1].N
+
+    supports c1-lane :
+      for i in 0 to 8 do :
+        require b : y3-dq-bit
+        c1-lane.d[i] => b.p
+      c1-lane.dmi => bank1.L[11].P
+      c1-lane.wck.P => bank1.L[13].P
+      c1-lane.wck.N => bank1.L[13].N
+      c1-lane.rdqs.P => bank1.L[9].P
+      c1-lane.rdqs.N => bank1.L[9].N
+
+    pcb-bundle ca0-bit :
+      port p
+    support-single(ca0-bit, bank0.L[3].N)
+    support-single(ca0-bit, bank0.L[7].P)
+    support-single(ca0-bit, bank0.L[7].N)
+    support-single(ca0-bit, bank0.L[11].N)
+    support-single(ca0-bit, bank0.L[15].P)
+    support-single(ca0-bit, bank0.L[15].N)
+    support-single(ca0-bit, bank1.L[11].N)
+
+    pcb-bundle ca1-bit :
+      port p
+    support-single(ca1-bit, bank2.L[4].P)
+    support-single(ca1-bit, bank2.L[4].N)
+    support-single(ca1-bit, bank2.L[5].P)
+    support-single(ca1-bit, bank2.L[5].N)
+    support-single(ca1-bit, bank2.L[6].P)
+    support-single(ca1-bit, bank2.L[6].N)
+    support-single(ca1-bit, bank2.L[7].P)
+
+    supports lpddr5x32r2 :
+      for i in 0 to 2 do :
+        require l : c0-lane
+        for (sp in pins(lpddr5x32r2.d[0][i]), rp in pins(l)) do :
+          sp => rp
+      for i in 0 to 2 do :
+        require l : c1-lane
+        for (sp in pins(lpddr5x32r2.d[1][i]), rp in pins(l)) do :
+          sp => rp
+
+      lpddr5x32r2.cs[0][0] => bank1.L[3].P
+      lpddr5x32r2.cs[0][1] => bank1.L[3].N
+      lpddr5x32r2.cs[1][0] => bank2.L[1].P
+      lpddr5x32r2.cs[1][1] => bank2.L[1].N
+
+      lpddr5x32r2.ck[0].P => bank1.L[15].P
+      lpddr5x32r2.ck[0].N => bank1.L[15].N
+      lpddr5x32r2.ck[1].P => bank2.L[0].P
+      lpddr5x32r2.ck[1].N => bank2.L[0].N
+
+      for i in 0 to 7 do :
+        require b : ca0-bit
+        lpddr5x32r2.ca[0][i] => b.p
+      for i in 0 to 7 do :
+        require b : ca1-bit
+        lpddr5x32r2.ca[1][i] => b.p
+
+      lpddr5x32r2.reset_n => bank2.L[3].N
 
 defn to-x5io-pin-name (bank:Int, lane:Int, polarity:String) -> String :
     val p = 2 * lane + (1 when polarity == "N" else 0)
@@ -2506,6 +2691,11 @@ defn support (bundle:Bundle, port:JITXObject) :
     supports bundle :
       for (bpin in pins(bundle), pin in pins(port)) do :
         bpin => pin
+
+defn support-single (bundle:Bundle, port:JITXObject) :
+  inside pcb-module :
+    supports bundle :
+      pins(bundle)[0] => port
 
 defn dot (obj:JITXObject, name:Printable) :
   dot(obj, to-string(name))
