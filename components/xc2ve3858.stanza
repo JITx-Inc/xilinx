@@ -2191,13 +2191,13 @@ protected pcb-module module (lpddr5-packings:LPDDR5Packing|Tuple<LPDDR5Packing>|
     val mmi? = contains?(GTYP_MMI_BANKS, bank)
     val prefix = "GTYP_MMI_" when mmi? else "GTYP_"
     for lane in 0 to 4 do :
-      net (GTYP[bank].L[lane].TX.P, dot(comp, "%_TXP%__%_" % [prefix, lane, bank]))
-      net (GTYP[bank].L[lane].TX.N, dot(comp, "%_TXN%__%_" % [prefix, lane, bank]))
-      net (GTYP[bank].L[lane].RX.P, dot(comp, "%_RXP%__%_" % [prefix, lane, bank]))
-      net (GTYP[bank].L[lane].RX.N, dot(comp, "%_RXN%__%_" % [prefix, lane, bank]))
+      topo-net(GTYP[bank].L[lane].TX.P, dot(comp, "%_TXP%__%_" % [prefix, lane, bank]))
+      topo-net(GTYP[bank].L[lane].TX.N, dot(comp, "%_TXN%__%_" % [prefix, lane, bank]))
+      topo-net(GTYP[bank].L[lane].RX.P, dot(comp, "%_RXP%__%_" % [prefix, lane, bank]))
+      topo-net(GTYP[bank].L[lane].RX.N, dot(comp, "%_RXN%__%_" % [prefix, lane, bank]))
     for i in 0 to 2 do :
-      net (GTYP[bank].REFCLK[i].P, dot(comp, "%_REFCLKP%__%_" % [prefix, i, bank]))
-      net (GTYP[bank].REFCLK[i].N, dot(comp, "%_REFCLKN%__%_" % [prefix, i, bank]))
+      topo-net(GTYP[bank].REFCLK[i].P, dot(comp, "%_REFCLKP%__%_" % [prefix, i, bank]))
+      topo-net(GTYP[bank].REFCLK[i].N, dot(comp, "%_REFCLKN%__%_" % [prefix, i, bank]))
 
   ; GTYP Power
   ; 3 regions: L, RN, RS
@@ -2248,8 +2248,8 @@ protected pcb-module module (lpddr5-packings:LPDDR5Packing|Tuple<LPDDR5Packing>|
   for bank in HDIO_BANKS do :
     for lane in 0 to 11 do :
       val hdgc = "_HDGC" when (lane >= 5 and lane <= 6) else ""
-      net (IO_HD[bank].L[lane].P, dot(comp, "IO_L%_P%__%_" % [lane, hdgc, bank]))
-      net (IO_HD[bank].L[lane].N, dot(comp, "IO_L%_N%__%_" % [lane, hdgc, bank]))
+      topo-net(IO_HD[bank].L[lane].P, dot(comp, "IO_L%_P%__%_" % [lane, hdgc, bank]))
+      topo-net(IO_HD[bank].L[lane].N, dot(comp, "IO_L%_N%__%_" % [lane, hdgc, bank]))
     net (IO_HD[bank].VCCO.V+, pins(dot(comp, "VCCO_%_" % [bank])))
     net (IO_HD[bank].VCCO.V-, GND)
 
@@ -2258,14 +2258,14 @@ protected pcb-module module (lpddr5-packings:LPDDR5Packing|Tuple<LPDDR5Packing>|
   for bank in PMC_MIO_BANKS do :
     val offset = (bank % 2) * 26
     for lane in 0 to 26 do :
-      net (PMC_MIO[bank].P[lane], dot(comp, "PMC_MIO%__%_" % [lane + offset, bank]))
+      topo-net(PMC_MIO[bank].P[lane], dot(comp, "PMC_MIO%__%_" % [lane + offset, bank]))
     net (PMC_MIO[bank].VCCO.V+, pins(dot(comp, "VCCO_%_" % [bank])))
     net (PMC_MIO[bank].VCCO.V-, GND)
 
   port LPD_MIO : lpd-mio-bank[LPD_MIO_BANKS]
   for bank in LPD_MIO_BANKS do :
     for lane in 0 to 26 do :
-      net (LPD_MIO[bank].P[lane], dot(comp, "LPD_MIO%__%_" % [lane, bank]))
+      topo-net(LPD_MIO[bank].P[lane], dot(comp, "LPD_MIO%__%_" % [lane, bank]))
     net (LPD_MIO[bank].VCCO.V+, pins(dot(comp, "VCCO_%_" % [bank])))
     net (LPD_MIO[bank].VCCO.V-, GND)
 
@@ -2275,8 +2275,8 @@ protected pcb-module module (lpddr5-packings:LPDDR5Packing|Tuple<LPDDR5Packing>|
   port ERROR_OUT : pin
   net (ERROR_OUT, comp.ERROR_OUT_503)
   port I3CI2C : i2c
-  net (I3CI2C.scl, comp.I3CI2C_SCL_503)
-  net (I3CI2C.sda, comp.I3CI2C_SDA_503)
+  topo-net(I3CI2C.scl, comp.I3CI2C_SCL_503)
+  topo-net(I3CI2C.sda, comp.I3CI2C_SDA_503)
   port MODE : pin[4]
   for i in 0 to 4 do :
     net (MODE[i], dot(comp, "MODE%__503" % [i]))
@@ -2301,8 +2301,8 @@ protected pcb-module module (lpddr5-packings:LPDDR5Packing|Tuple<LPDDR5Packing>|
 
   ; USB
   port USB_AUX : diff-pair
-  net (USB_AUX.P, comp.USB_AUXP_504)
-  net (USB_AUX.N, comp.USB_AUXN_504)
+  topo-net(USB_AUX.P, comp.USB_AUXP_504)
+  topo-net(USB_AUX.N, comp.USB_AUXN_504)
   port VCCIO_PAUX : power
   for p in pins(comp.VCCIO_PAUX_504) do :
     net (VCCIO_PAUX.V+, p)
@@ -2315,8 +2315,8 @@ protected pcb-module module (lpddr5-packings:LPDDR5Packing|Tuple<LPDDR5Packing>|
   port USB2 : usb-2-connector
   net (USB2.vbus.V+, comp.USB2_VBUS0_504)
   net (USB2.vbus.V-, GND)
-  net (USB2.bus.data.P, comp.USB2_DP0_504)
-  net (USB2.bus.data.N, comp.USB2_DN0_504)
+  topo-net(USB2.bus.data.P, comp.USB2_DP0_504)
+  topo-net(USB2.bus.data.N, comp.USB2_DN0_504)
   net (USB2.id, comp.USB2_ID0_504)
   port USB2_TXRTUNE : pin
   net (USB2_TXRTUNE, comp.USB2_TXRTUNE_504)
@@ -2332,17 +2332,17 @@ protected pcb-module module (lpddr5-packings:LPDDR5Packing|Tuple<LPDDR5Packing>|
   net (VCC_USB2.V-, GND)
 
   port USB3 : gtr-usb3
-  net (USB3.REFCLK.P, comp.USB3_REF_CLKP_504)
-  net (USB3.REFCLK.N, comp.USB3_REF_CLKN_504)
-  net (USB3.RESREF, comp.USB3_RESREF_504)
-  net (USB3.TX[0].P, comp.USB3_TXP0_504)
-  net (USB3.TX[0].N, comp.USB3_TXN0_504)
-  net (USB3.TXRX[1].P, comp.USB3_TXRXP1_504)
-  net (USB3.TXRX[1].N, comp.USB3_TXRXN1_504)
-  net (USB3.TXRX[2].P, comp.USB3_TXRXP2_504)
-  net (USB3.TXRX[2].N, comp.USB3_TXRXN2_504)
-  net (USB3.TX[3].P, comp.USB3_TXP3_504)
-  net (USB3.TX[3].N, comp.USB3_TXN3_504)
+  topo-net(USB3.REFCLK.P, comp.USB3_REF_CLKP_504)
+  topo-net(USB3.REFCLK.N, comp.USB3_REF_CLKN_504)
+  topo-net(USB3.RESREF, comp.USB3_RESREF_504)
+  topo-net(USB3.TX[0].P, comp.USB3_TXP0_504)
+  topo-net(USB3.TX[0].N, comp.USB3_TXN0_504)
+  topo-net(USB3.TXRX[1].P, comp.USB3_TXRXP1_504)
+  topo-net(USB3.TXRX[1].N, comp.USB3_TXRXN1_504)
+  topo-net(USB3.TXRX[2].P, comp.USB3_TXRXP2_504)
+  topo-net(USB3.TXRX[2].N, comp.USB3_TXRXN2_504)
+  topo-net(USB3.TX[3].P, comp.USB3_TXP3_504)
+  topo-net(USB3.TX[3].N, comp.USB3_TXN3_504)
   for p in pins(comp.VCCIO_USB3_504) do :
     net (USB3.VCCIO.V+, p)
   net (USB3.VCCIO.V-, GND)
@@ -2355,11 +2355,11 @@ protected pcb-module module (lpddr5-packings:LPDDR5Packing|Tuple<LPDDR5Packing>|
   for bank in MIPI_BANKS do :
     net (MIPI[bank].RESREF, dot(comp, "MIPI_RESREF_%_" % [bank]))
     for polarity in ["P", "N"] do :
-      net (dot(MIPI[bank].REFCLK, polarity), dot(comp, "MIPI_REF_CLK%__%_" % [polarity, bank]))
+      topo-net(dot(MIPI[bank].REFCLK, polarity), dot(comp, "MIPI_REF_CLK%__%_" % [polarity, bank]))
       for lane in 0 to 2 do :
         val lane-port = MIPI[bank].L[lane]
         for tr in ["TX", "RX"] do :
-          net (dot(dot(lane-port, tr), polarity), dot(comp, "MIPI_%_D%_%__%_" % [tr, polarity, lane, bank]))
+          topo-net(dot(dot(lane-port, tr), polarity), dot(comp, "MIPI_%_D%_%__%_" % [tr, polarity, lane, bank]))
     net (GND, MIPI[bank].VCCIO.V-, MIPI[bank].VCC.V-)
     for p in pins(dot(comp, "VCCIO_MIPI_%_" % [bank])) do :
       net (MIPI[bank].VCCIO.V+, p)
@@ -2373,7 +2373,7 @@ protected pcb-module module (lpddr5-packings:LPDDR5Packing|Tuple<LPDDR5Packing>|
     for lane in 0 to 16 do :
       for polarity in ["P", "N"] do :
         val pin-name = to-x5io-pin-name(bank, lane, polarity)
-        net (dot(IO_X5[bank].L[lane], polarity), dot(comp, pin-name))
+        topo-net(dot(IO_X5[bank].L[lane], polarity), dot(comp, pin-name))
     ; VCCO is shared between banks 700-704
     val vcco-bank = X5IO_VCCO_BANKS[i]
     net (IO_X5[bank].VCCO.V+, pins(dot(comp, "VCCO_%_" % [vcco-bank])))
