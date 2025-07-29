@@ -2481,7 +2481,7 @@ protected pcb-module module (lpddr5-packings:LPDDR5Packing|Tuple<LPDDR5Packing>|
         (i:Int) : IndexRef(Ref(`bank), i))
 
   make-supports()
-  make-all-lpddr5-supports(lpddr5-packings)
+  make-all-lpddr5-supports(comp, lpddr5-packings)
 
 defn make-supports () :
   make-gtyp-supports()
@@ -2771,17 +2771,14 @@ defn to-config (packing:LPDDR5Packing) :
     PackedLeft     : LPDDR5-PACKED-LEFT-CONFIG
     PackedRight    : LPDDR5-PACKED-RIGHT-CONFIG
 
+defn get-pin (comp:JITXObject, bank-index:Int, lane-index:Int, polarity:String) :
+  val pin-name = to-x5io-pin-name(bank-index, lane-index, polarity)
+  dot(comp, pin-name)
 
-defn get-pin (bank-index:Int, lane-index:Int, polarity:String) :
-  inside pcb-module :
-    val bank = self.IO_X5[bank-index]
-    val lane = bank.L[lane-index]
-    dot(lane, polarity)
+defn get-pin (comp:JITXObject, base-bank:Int, site:TripletSite) :
+  get-pin(comp, base-bank + bank(site), lane(site), polarity(site))
 
-defn get-pin (base-bank:Int, site:TripletSite) :
-  get-pin(base-bank + bank(site), lane(site), polarity(site))
-
-defn make-all-lpddr5-supports (packings:LPDDR5Packing|Tuple<LPDDR5Packing>|False) :
+defn make-all-lpddr5-supports (comp:JITXObject, packings:LPDDR5Packing|Tuple<LPDDR5Packing>|False) :
   for i in 0 to X5IO_NUM_DDRMC do :
     val base-bank = X5IO_DDRMC_BASE_BANKS[i]
     val packing = match(packings) :
@@ -2794,9 +2791,9 @@ defn make-all-lpddr5-supports (packings:LPDDR5Packing|Tuple<LPDDR5Packing>|False
         packings[i]
       (_:False) :
         OptimumPacking
-    make-lpddr5-supports(to-config(packing), base-bank)
+    make-lpddr5-supports(comp, to-config(packing), base-bank)
 
-defn make-lpddr5-supports (config:LPDDR5Config, base-bank:Int) :
+defn make-lpddr5-supports (comp:JITXObject, config:LPDDR5Config, base-bank:Int) :
   inside pcb-module :
     val ch0 = channels(config)[0]
     val ch1 = channels(config)[1]
@@ -2809,26 +2806,26 @@ defn make-lpddr5-supports (config:LPDDR5Config, base-bank:Int) :
     pcb-bundle y0-dq-bit :
       port p
     for lane in [0, 2, 4, 6] do :
-      support-single(y0-dq-bit, get-pin(base-bank + bank(y0), lane, "P"))
-      support-single(y0-dq-bit, get-pin(base-bank + bank(y0), lane, "N"))
+      support-single(y0-dq-bit, get-pin(comp, base-bank + bank(y0), lane, "P"))
+      support-single(y0-dq-bit, get-pin(comp, base-bank + bank(y0), lane, "N"))
 
     pcb-bundle y1-dq-bit :
       port p
     for lane in [8, 10, 12, 14] do :
-      support-single(y1-dq-bit, get-pin(base-bank + bank(y1), lane, "P"))
-      support-single(y1-dq-bit, get-pin(base-bank + bank(y1), lane, "N"))
+      support-single(y1-dq-bit, get-pin(comp, base-bank + bank(y1), lane, "P"))
+      support-single(y1-dq-bit, get-pin(comp, base-bank + bank(y1), lane, "N"))
 
     pcb-bundle y2-dq-bit :
       port p
     for lane in [0, 2, 4, 6] do :
-      support-single(y2-dq-bit, get-pin(base-bank + bank(y2), lane, "P"))
-      support-single(y2-dq-bit, get-pin(base-bank + bank(y2), lane, "N"))
+      support-single(y2-dq-bit, get-pin(comp, base-bank + bank(y2), lane, "P"))
+      support-single(y2-dq-bit, get-pin(comp, base-bank + bank(y2), lane, "N"))
 
     pcb-bundle y3-dq-bit :
       port p
     for lane in [8, 10, 12, 14] do :
-      support-single(y3-dq-bit, get-pin(base-bank + bank(y3), lane, "P"))
-      support-single(y3-dq-bit, get-pin(base-bank + bank(y3), lane, "N"))
+      support-single(y3-dq-bit, get-pin(comp, base-bank + bank(y3), lane, "P"))
+      support-single(y3-dq-bit, get-pin(comp, base-bank + bank(y3), lane, "N"))
 
     pcb-bundle ch0-lane :
       port d : pin[8]
@@ -2840,21 +2837,21 @@ defn make-lpddr5-supports (config:LPDDR5Config, base-bank:Int) :
       for i in 0 to 8 do :
         require b : y0-dq-bit
         ch0-lane.d[i] => b.p
-      ch0-lane.dmi => get-pin(base-bank + bank(y0), dmi(y0), "P")
-      ch0-lane.wck.P => get-pin(base-bank + bank(y0), wck(y0), "P")
-      ch0-lane.wck.N => get-pin(base-bank + bank(y0), wck(y0), "N")
-      ch0-lane.rdqs.P => get-pin(base-bank + bank(y0), rdqs(y0), "P")
-      ch0-lane.rdqs.N => get-pin(base-bank + bank(y0), rdqs(y0), "N")
+      ch0-lane.dmi => get-pin(comp, base-bank + bank(y0), dmi(y0), "P")
+      ch0-lane.wck.P => get-pin(comp, base-bank + bank(y0), wck(y0), "P")
+      ch0-lane.wck.N => get-pin(comp, base-bank + bank(y0), wck(y0), "N")
+      ch0-lane.rdqs.P => get-pin(comp, base-bank + bank(y0), rdqs(y0), "P")
+      ch0-lane.rdqs.N => get-pin(comp, base-bank + bank(y0), rdqs(y0), "N")
 
     supports ch0-lane :
       for i in 0 to 8 do :
         require b : y1-dq-bit
         ch0-lane.d[i] => b.p
-      ch0-lane.dmi => get-pin(base-bank + bank(y1), dmi(y1), "P")
-      ch0-lane.wck.P => get-pin(base-bank + bank(y1), wck(y1), "P")
-      ch0-lane.wck.N => get-pin(base-bank + bank(y1), wck(y1), "N")
-      ch0-lane.rdqs.P => get-pin(base-bank + bank(y1), rdqs(y1), "P")
-      ch0-lane.rdqs.N => get-pin(base-bank + bank(y1), rdqs(y1), "N")
+      ch0-lane.dmi => get-pin(comp, base-bank + bank(y1), dmi(y1), "P")
+      ch0-lane.wck.P => get-pin(comp, base-bank + bank(y1), wck(y1), "P")
+      ch0-lane.wck.N => get-pin(comp, base-bank + bank(y1), wck(y1), "N")
+      ch0-lane.rdqs.P => get-pin(comp, base-bank + bank(y1), rdqs(y1), "P")
+      ch0-lane.rdqs.N => get-pin(comp, base-bank + bank(y1), rdqs(y1), "N")
 
     pcb-bundle ch1-lane :
       port d : pin[8]
@@ -2866,31 +2863,31 @@ defn make-lpddr5-supports (config:LPDDR5Config, base-bank:Int) :
       for i in 0 to 8 do :
         require b : y2-dq-bit
         ch1-lane.d[i] => b.p
-      ch1-lane.dmi => get-pin(base-bank + bank(y2), dmi(y2), "P")
-      ch1-lane.wck.P => get-pin(base-bank + bank(y2), wck(y2), "P")
-      ch1-lane.wck.N => get-pin(base-bank + bank(y2), wck(y2), "N")
-      ch1-lane.rdqs.P => get-pin(base-bank + bank(y2), rdqs(y2), "P")
-      ch1-lane.rdqs.N => get-pin(base-bank + bank(y2), rdqs(y2), "N")
+      ch1-lane.dmi => get-pin(comp, base-bank + bank(y2), dmi(y2), "P")
+      ch1-lane.wck.P => get-pin(comp, base-bank + bank(y2), wck(y2), "P")
+      ch1-lane.wck.N => get-pin(comp, base-bank + bank(y2), wck(y2), "N")
+      ch1-lane.rdqs.P => get-pin(comp, base-bank + bank(y2), rdqs(y2), "P")
+      ch1-lane.rdqs.N => get-pin(comp, base-bank + bank(y2), rdqs(y2), "N")
 
     supports ch1-lane :
       for i in 0 to 8 do :
         require b : y3-dq-bit
         ch1-lane.d[i] => b.p
-      ch1-lane.dmi => get-pin(base-bank + bank(y3), dmi(y3), "P")
-      ch1-lane.wck.P => get-pin(base-bank + bank(y3), wck(y3), "P")
-      ch1-lane.wck.N => get-pin(base-bank + bank(y3), wck(y3), "N")
-      ch1-lane.rdqs.P => get-pin(base-bank + bank(y3), rdqs(y3), "P")
-      ch1-lane.rdqs.N => get-pin(base-bank + bank(y3), rdqs(y3), "N")
+      ch1-lane.dmi => get-pin(comp, base-bank + bank(y3), dmi(y3), "P")
+      ch1-lane.wck.P => get-pin(comp, base-bank + bank(y3), wck(y3), "P")
+      ch1-lane.wck.N => get-pin(comp, base-bank + bank(y3), wck(y3), "N")
+      ch1-lane.rdqs.P => get-pin(comp, base-bank + bank(y3), rdqs(y3), "P")
+      ch1-lane.rdqs.N => get-pin(comp, base-bank + bank(y3), rdqs(y3), "N")
 
     pcb-bundle ca0-bit :
       port p
     for site in ca(ch0) do :
-      support-single(ca0-bit, get-pin(base-bank, site))
+      support-single(ca0-bit, get-pin(comp, base-bank, site))
 
     pcb-bundle ca1-bit :
       port p
     for site in ca(ch1) do :
-      support-single(ca1-bit, get-pin(base-bank, site))
+      support-single(ca1-bit, get-pin(comp, base-bank, site))
 
     supports lpddr5x32r2 :
       for i in 0 to 2 do :
@@ -2905,9 +2902,9 @@ defn make-lpddr5-supports (config:LPDDR5Config, base-bank:Int) :
       for i in 0 to 2 do :
         val ch = channels(config)[i]
         for j in 0 to 2 do :
-          lpddr5x32r2.cs[i][j] => get-pin(base-bank, cs(ch)[j])
-        lpddr5x32r2.ck[i].P => get-pin(base-bank + ck(ch)[0], ck(ch)[1], "P")
-        lpddr5x32r2.ck[i].N => get-pin(base-bank + ck(ch)[0], ck(ch)[1], "N")
+          lpddr5x32r2.cs[i][j] => get-pin(comp, base-bank, cs(ch)[j])
+        lpddr5x32r2.ck[i].P => get-pin(comp, base-bank + ck(ch)[0], ck(ch)[1], "P")
+        lpddr5x32r2.ck[i].N => get-pin(comp, base-bank + ck(ch)[0], ck(ch)[1], "N")
 
       for i in 0 to 7 do :
         require b : ca0-bit
@@ -2916,7 +2913,7 @@ defn make-lpddr5-supports (config:LPDDR5Config, base-bank:Int) :
         require b : ca1-bit
         lpddr5x32r2.ca[1][i] => b.p
 
-      lpddr5x32r2.reset_n => get-pin(base-bank, reset-site(config))
+      lpddr5x32r2.reset_n => get-pin(comp, base-bank, reset-site(config))
 
 defn to-x5io-pin-name (bank:Int, lane:Int, polarity:String) -> String :
     val p = 2 * lane + (1 when polarity == "N" else 0)
