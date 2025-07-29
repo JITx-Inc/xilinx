@@ -2620,10 +2620,10 @@ defn make-lpddr5-packed-left-supports (base-bank:Int) :
     support-single(ca1-bit, bank2.L[4].P)
     support-single(ca1-bit, bank2.L[4].N)
     support-single(ca1-bit, bank2.L[5].P)
-    support-single(ca1-bit, bank2.L[5].N)
     support-single(ca1-bit, bank2.L[6].P)
     support-single(ca1-bit, bank2.L[6].N)
     support-single(ca1-bit, bank2.L[7].P)
+    support-single(ca1-bit, bank2.L[7].N)
 
     supports lpddr5x32r2 :
       for i in 0 to 2 do :
@@ -2636,14 +2636,14 @@ defn make-lpddr5-packed-left-supports (base-bank:Int) :
           sp => rp
 
       lpddr5x32r2.cs[0][0] => bank1.L[3].P
-      lpddr5x32r2.cs[0][1] => bank1.L[3].N
-      lpddr5x32r2.cs[1][0] => bank2.L[1].P
-      lpddr5x32r2.cs[1][1] => bank2.L[1].N
+      lpddr5x32r2.cs[1][0] => bank1.L[3].N
+      lpddr5x32r2.cs[0][1] => bank2.L[2].P
+      lpddr5x32r2.cs[1][1] => bank2.L[2].N
 
       lpddr5x32r2.ck[0].P => bank1.L[15].P
       lpddr5x32r2.ck[0].N => bank1.L[15].N
-      lpddr5x32r2.ck[1].P => bank2.L[0].P
-      lpddr5x32r2.ck[1].N => bank2.L[0].N
+      lpddr5x32r2.ck[1].P => bank2.L[1].P
+      lpddr5x32r2.ck[1].N => bank2.L[1].N
 
       for i in 0 to 7 do :
         require b : ca0-bit
