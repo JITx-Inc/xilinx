@@ -31,6 +31,8 @@ val X5IO_MC_LOOKUP = to-inttable<[Int,Int]>([
 ])
 ; lowest bank number for each DDRMC bank triplet
 val X5IO_DDRMC_BASE_BANKS = [700, 703, 707, 710, 713]
+; number of memory controllers
+val X5IO_NUM_DDRMC = length(X5IO_DDRMC_BASE_BANKS)
 
 protected pcb-component component :
   pin-properties :
@@ -2155,7 +2157,22 @@ protected pcb-component component :
   assign-symbols(seq({_ => box}, unique-sym-banks))
   assign-landpattern(ssva2112-bga)
 
-protected pcb-module module :
+doc: \<DOC>
+LPDDR5 Packing Pinout Style
+
+This enum specifies a packing configuration for the pinout of a LPDDR5 memory
+controller. This provides flexibility for routing. If space is available,
+`OptimumPacking` is the best configuration, and it is the default.
+@member OptimumPacking
+@member PackedLeft
+@member PackedRight
+<DOC>
+public pcb-enum components/xc2ve3858/LPDDR5Packing :
+  OptimumPacking
+  PackedLeft
+  PackedRight
+
+protected pcb-module module (lpddr5-packings:LPDDR5Packing|Tuple<LPDDR5Packing>|False = false) :
   inst comp : component
   port GND : pin
   for p in pins(comp.GND) do :
@@ -2464,6 +2481,7 @@ protected pcb-module module :
         (i:Int) : IndexRef(Ref(`bank), i))
 
   make-supports()
+  make-all-lpddr5-supports(lpddr5-packings)
 
 defn make-supports () :
   make-gtyp-supports()
@@ -2473,7 +2491,6 @@ defn make-supports () :
   make-mipi-supports()
   make-x5io-supports()
   make-usb-supports()
-  make-lpddr5-supports()
 
 defn make-gtyp-supports () :
   inside pcb-module :
@@ -2517,133 +2534,380 @@ defn make-usb-supports () :
 
 public val lpddr5x32r2 = lpddr5(LPDDR5-x32, LPDDR5-DualRank)
 
-defn make-lpddr5-supports () :
-  ;make-lpddr5-default-supports()
-  for base-bank in X5IO_DDRMC_BASE_BANKS do :
-    make-lpddr5-packed-left-supports(base-bank)
-  ;make-lpddr5-packed-right-supports()
+defstruct TripletSite :
+  bank: Int ; 0, 1, or 2
+  lane: Int ; 0-15
+  polarity: String ; P or N
 
-defn make-lpddr5-packed-left-supports (base-bank:Int) :
+defstruct LPDDR5ConfigLane :
+  bank: Int ; 0, 1, or 2
+  wck: Int ; 1, 5, 9, or 13
+  rdqs: Int ; 1, 5, 9, or 13
+  dmi: Int ; 3, 7, 11, or 15, always the P pin
+with:
+  keyword-constructor
+
+defstruct LPDDR5ConfigChannel :
+  lanes: [LPDDR5ConfigLane,LPDDR5ConfigLane]
+  ; cs[0], cs[1]
+  cs: [TripletSite,TripletSite]
+  ; [bank, lane]
+  ck: [Int,Int]
+  ; ca[0 through 6]
+  ca: Tuple<TripletSite>
+with:
+  keyword-constructor
+
+defstruct LPDDR5Config :
+  channels: [LPDDR5ConfigChannel,LPDDR5ConfigChannel]
+  reset-site: TripletSite
+with:
+  keyword-constructor
+
+val LPDDR5-OPTIMUM-CONFIG =
+  LPDDR5Config(
+    channels = [
+    LPDDR5ConfigChannel(
+      lanes = [
+      LPDDR5ConfigLane(
+        bank = 2,
+        wck = 5,
+        rdqs = 1,
+        dmi = 7
+      ),
+      LPDDR5ConfigLane(
+        bank = 2,
+        wck = 13,
+        rdqs = 9,
+        dmi = 11,
+      )
+      ],
+      cs = [
+        TripletSite(1, 10, "P"),
+        TripletSite(1, 11, "P")
+      ],
+      ck = [1, 15],
+      ca = [
+        TripletSite(1, 8, "P"),
+        TripletSite(1, 8, "N"),
+        TripletSite(1, 12, "P"),
+        TripletSite(1, 12, "N"),
+        TripletSite(1, 13, "P"),
+        TripletSite(1, 14, "P"),
+        TripletSite(1, 14, "N"),
+      ]
+    ),
+    LPDDR5ConfigChannel(
+      lanes = [
+      LPDDR5ConfigLane(
+        bank = 0,
+        wck = 5,
+        rdqs = 1,
+        dmi = 7
+      ),
+      LPDDR5ConfigLane(
+        bank = 0,
+        wck = 13,
+        rdqs = 9,
+        dmi = 15,
+      )
+      ],
+      cs = [
+        TripletSite(1, 10, "N"),
+        TripletSite(1, 11, "N")
+      ],
+      ck = [1, 9],
+      ca = [
+        TripletSite(1, 0, "N"),
+        TripletSite(1, 1, "P"),
+        TripletSite(1, 2, "P"),
+        TripletSite(1, 4, "N"),
+        TripletSite(1, 5, "P"),
+        TripletSite(1, 6, "P"),
+        TripletSite(1, 6, "N"),
+      ]
+    )
+    ],
+    reset-site = TripletSite(1, 4, "P")
+  )
+
+val LPDDR5-PACKED-LEFT-CONFIG =
+  LPDDR5Config(
+    channels = [
+    LPDDR5ConfigChannel(
+      lanes = [
+      LPDDR5ConfigLane(
+        bank = 0,
+        wck = 1,
+        rdqs = 5,
+        dmi = 3
+      ),
+      LPDDR5ConfigLane(
+        bank = 0,
+        wck = 9,
+        rdqs = 13,
+        dmi = 11
+      )
+      ],
+      cs = [
+        TripletSite(1, 3, "P"),
+        TripletSite(2, 2, "P")
+      ],
+      ck = [1, 15],
+      ca = [
+        TripletSite(1, 11, "N"),
+        TripletSite(0, 15, "N"),
+        TripletSite(0, 15, "P"),
+        TripletSite(0, 11, "N"),
+        TripletSite(0, 7, "N"),
+        TripletSite(0, 7, "P"),
+        TripletSite(0, 3, "N")
+      ]
+    ),
+    LPDDR5ConfigChannel(
+      lanes = [
+      LPDDR5ConfigLane(
+        bank = 1,
+        wck = 5,
+        rdqs = 1,
+        dmi = 7
+      ),
+      LPDDR5ConfigLane(
+        bank = 1,
+        wck = 13,
+        rdqs = 9,
+        dmi = 11
+      )
+      ],
+      cs = [
+        TripletSite(1, 3, "N"),
+        TripletSite(2, 2, "N")
+      ],
+      ck = [2, 1],
+      ca = [
+        TripletSite(2, 7, "N"),
+        TripletSite(2, 7, "P"),
+        TripletSite(2, 6, "N"),
+        TripletSite(2, 6, "P"),
+        TripletSite(2, 5, "P"),
+        TripletSite(2, 4, "N"),
+        TripletSite(2, 4, "P")
+      ]
+    )
+    ],
+    reset-site = TripletSite(1, 7, "N")
+  )
+
+val LPDDR5-PACKED-RIGHT-CONFIG =
+  LPDDR5Config(
+    channels = [
+    LPDDR5ConfigChannel(
+      lanes = [
+      LPDDR5ConfigLane(
+        bank = 2,
+        wck = 5,
+        rdqs = 1,
+        dmi = 7
+      ),
+      LPDDR5ConfigLane(
+        bank = 2,
+        wck = 13,
+        rdqs = 9,
+        dmi = 15
+      )
+      ],
+      cs = [
+        TripletSite(0, 15, "P"),
+        TripletSite(0, 14, "P")
+      ],
+      ck = [1, 15],
+      ca = [
+        TripletSite(1, 11, "N"),
+        TripletSite(1, 3, "N"),
+        TripletSite(1, 3, "P"),
+        TripletSite(2, 7, "N"),
+        TripletSite(2, 11, "N"),
+        TripletSite(2, 11, "P"),
+        TripletSite(2, 15, "N")
+      ]
+    ),
+    LPDDR5ConfigChannel(
+      lanes = [
+      LPDDR5ConfigLane(
+        bank = 1,
+        wck = 1,
+        rdqs = 5,
+        dmi = 7
+      ),
+      LPDDR5ConfigLane(
+        bank = 1,
+        wck = 9,
+        rdqs = 13,
+        dmi = 11
+      )
+      ],
+      cs = [
+        TripletSite(0, 15, "N"),
+        TripletSite(0, 14, "N")
+      ],
+      ck = [0, 13],
+      ca = [
+        TripletSite(0, 11, "N"),
+        TripletSite(0, 11, "P"),
+        TripletSite(0, 10, "N"),
+        TripletSite(0, 10, "P"),
+        TripletSite(0, 9, "P"),
+        TripletSite(0, 8, "N"),
+        TripletSite(0, 8, "P")
+      ]
+    )
+    ],
+    reset-site = TripletSite(1, 7, "N")
+  )
+
+defn to-config (packing:LPDDR5Packing) :
+  switch(packing) :
+    OptimumPacking : LPDDR5-OPTIMUM-CONFIG
+    PackedLeft     : LPDDR5-PACKED-LEFT-CONFIG
+    PackedRight    : LPDDR5-PACKED-RIGHT-CONFIG
+
+
+defn get-pin (bank-index:Int, lane-index:Int, polarity:String) :
   inside pcb-module :
-    val bank0 = self.IO_X5[base-bank]
-    val bank1 = self.IO_X5[base-bank + 1]
-    val bank2 = self.IO_X5[base-bank + 2]
+    val bank = self.IO_X5[bank-index]
+    val lane = bank.L[lane-index]
+    dot(lane, polarity)
+
+defn get-pin (base-bank:Int, site:TripletSite) :
+  get-pin(base-bank + bank(site), lane(site), polarity(site))
+
+defn make-all-lpddr5-supports (packings:LPDDR5Packing|Tuple<LPDDR5Packing>|False) :
+  for i in 0 to X5IO_NUM_DDRMC do :
+    val base-bank = X5IO_DDRMC_BASE_BANKS[i]
+    val packing = match(packings) :
+      (packing:LPDDR5Packing) : packing
+      (packings:Tuple<LPDDR5Packing>) :
+        if length(packings) != X5IO_NUM_DDRMC :
+          throw(Exception("The number of LPDDR5 packing configurations \
+            provided does not match number of memory controllers: %_ != %_"
+            % [length(packings), X5IO_NUM_DDRMC]))
+        packings[i]
+      (_:False) :
+        OptimumPacking
+    make-lpddr5-supports(to-config(packing), base-bank)
+
+defn make-lpddr5-supports (config:LPDDR5Config, base-bank:Int) :
+  inside pcb-module :
+    val ch0 = channels(config)[0]
+    val ch1 = channels(config)[1]
+
+    val y0 = lanes(ch0)[0]
+    val y1 = lanes(ch0)[1]
+    val y2 = lanes(ch1)[0]
+    val y3 = lanes(ch1)[1]
 
     pcb-bundle y0-dq-bit :
       port p
     for lane in [0, 2, 4, 6] do :
-      support-single(y0-dq-bit, bank0.L[lane].P)
-      support-single(y0-dq-bit, bank0.L[lane].N)
+      support-single(y0-dq-bit, get-pin(base-bank + bank(y0), lane, "P"))
+      support-single(y0-dq-bit, get-pin(base-bank + bank(y0), lane, "N"))
 
     pcb-bundle y1-dq-bit :
       port p
     for lane in [8, 10, 12, 14] do :
-      support-single(y1-dq-bit, bank0.L[lane].P)
-      support-single(y1-dq-bit, bank0.L[lane].N)
+      support-single(y1-dq-bit, get-pin(base-bank + bank(y1), lane, "P"))
+      support-single(y1-dq-bit, get-pin(base-bank + bank(y1), lane, "N"))
 
     pcb-bundle y2-dq-bit :
       port p
     for lane in [0, 2, 4, 6] do :
-      support-single(y2-dq-bit, bank1.L[lane].P)
-      support-single(y2-dq-bit, bank1.L[lane].N)
+      support-single(y2-dq-bit, get-pin(base-bank + bank(y2), lane, "P"))
+      support-single(y2-dq-bit, get-pin(base-bank + bank(y2), lane, "N"))
 
     pcb-bundle y3-dq-bit :
       port p
     for lane in [8, 10, 12, 14] do :
-      support-single(y3-dq-bit, bank1.L[lane].P)
-      support-single(y3-dq-bit, bank1.L[lane].N)
+      support-single(y3-dq-bit, get-pin(base-bank + bank(y3), lane, "P"))
+      support-single(y3-dq-bit, get-pin(base-bank + bank(y3), lane, "N"))
 
-    pcb-bundle c0-lane :
+    pcb-bundle ch0-lane :
       port d : pin[8]
       port dmi : pin
       port wck : diff-pair
       port rdqs : diff-pair
 
-    supports c0-lane :
+    supports ch0-lane :
       for i in 0 to 8 do :
         require b : y0-dq-bit
-        c0-lane.d[i] => b.p
-      c0-lane.dmi => bank0.L[3].P
-      c0-lane.wck.P => bank0.L[1].P
-      c0-lane.wck.N => bank0.L[1].N
-      c0-lane.rdqs.P => bank0.L[5].P
-      c0-lane.rdqs.N => bank0.L[5].N
+        ch0-lane.d[i] => b.p
+      ch0-lane.dmi => get-pin(base-bank + bank(y0), dmi(y0), "P")
+      ch0-lane.wck.P => get-pin(base-bank + bank(y0), wck(y0), "P")
+      ch0-lane.wck.N => get-pin(base-bank + bank(y0), wck(y0), "N")
+      ch0-lane.rdqs.P => get-pin(base-bank + bank(y0), rdqs(y0), "P")
+      ch0-lane.rdqs.N => get-pin(base-bank + bank(y0), rdqs(y0), "N")
 
-    supports c0-lane :
+    supports ch0-lane :
       for i in 0 to 8 do :
         require b : y1-dq-bit
-        c0-lane.d[i] => b.p
-      c0-lane.dmi => bank0.L[11].P
-      c0-lane.wck.P => bank0.L[9].P
-      c0-lane.wck.N => bank0.L[9].N
-      c0-lane.rdqs.P => bank0.L[13].P
-      c0-lane.rdqs.N => bank0.L[13].N
+        ch0-lane.d[i] => b.p
+      ch0-lane.dmi => get-pin(base-bank + bank(y1), dmi(y1), "P")
+      ch0-lane.wck.P => get-pin(base-bank + bank(y1), wck(y1), "P")
+      ch0-lane.wck.N => get-pin(base-bank + bank(y1), wck(y1), "N")
+      ch0-lane.rdqs.P => get-pin(base-bank + bank(y1), rdqs(y1), "P")
+      ch0-lane.rdqs.N => get-pin(base-bank + bank(y1), rdqs(y1), "N")
 
-    pcb-bundle c1-lane :
+    pcb-bundle ch1-lane :
       port d : pin[8]
       port dmi : pin
       port wck : diff-pair
       port rdqs : diff-pair
 
-    supports c1-lane :
+    supports ch1-lane :
       for i in 0 to 8 do :
         require b : y2-dq-bit
-        c1-lane.d[i] => b.p
-      c1-lane.dmi => bank1.L[7].P
-      c1-lane.wck.P => bank1.L[5].P
-      c1-lane.wck.N => bank1.L[5].N
-      c1-lane.rdqs.P => bank1.L[1].P
-      c1-lane.rdqs.N => bank1.L[1].N
+        ch1-lane.d[i] => b.p
+      ch1-lane.dmi => get-pin(base-bank + bank(y2), dmi(y2), "P")
+      ch1-lane.wck.P => get-pin(base-bank + bank(y2), wck(y2), "P")
+      ch1-lane.wck.N => get-pin(base-bank + bank(y2), wck(y2), "N")
+      ch1-lane.rdqs.P => get-pin(base-bank + bank(y2), rdqs(y2), "P")
+      ch1-lane.rdqs.N => get-pin(base-bank + bank(y2), rdqs(y2), "N")
 
-    supports c1-lane :
+    supports ch1-lane :
       for i in 0 to 8 do :
         require b : y3-dq-bit
-        c1-lane.d[i] => b.p
-      c1-lane.dmi => bank1.L[11].P
-      c1-lane.wck.P => bank1.L[13].P
-      c1-lane.wck.N => bank1.L[13].N
-      c1-lane.rdqs.P => bank1.L[9].P
-      c1-lane.rdqs.N => bank1.L[9].N
+        ch1-lane.d[i] => b.p
+      ch1-lane.dmi => get-pin(base-bank + bank(y3), dmi(y3), "P")
+      ch1-lane.wck.P => get-pin(base-bank + bank(y3), wck(y3), "P")
+      ch1-lane.wck.N => get-pin(base-bank + bank(y3), wck(y3), "N")
+      ch1-lane.rdqs.P => get-pin(base-bank + bank(y3), rdqs(y3), "P")
+      ch1-lane.rdqs.N => get-pin(base-bank + bank(y3), rdqs(y3), "N")
 
     pcb-bundle ca0-bit :
       port p
-    support-single(ca0-bit, bank0.L[3].N)
-    support-single(ca0-bit, bank0.L[7].P)
-    support-single(ca0-bit, bank0.L[7].N)
-    support-single(ca0-bit, bank0.L[11].N)
-    support-single(ca0-bit, bank0.L[15].P)
-    support-single(ca0-bit, bank0.L[15].N)
-    support-single(ca0-bit, bank1.L[11].N)
+    for site in ca(ch0) do :
+      support-single(ca0-bit, get-pin(base-bank, site))
 
     pcb-bundle ca1-bit :
       port p
-    support-single(ca1-bit, bank2.L[4].P)
-    support-single(ca1-bit, bank2.L[4].N)
-    support-single(ca1-bit, bank2.L[5].P)
-    support-single(ca1-bit, bank2.L[6].P)
-    support-single(ca1-bit, bank2.L[6].N)
-    support-single(ca1-bit, bank2.L[7].P)
-    support-single(ca1-bit, bank2.L[7].N)
+    for site in ca(ch1) do :
+      support-single(ca1-bit, get-pin(base-bank, site))
 
     supports lpddr5x32r2 :
       for i in 0 to 2 do :
-        require l : c0-lane
+        require l : ch0-lane
         for (sp in pins(lpddr5x32r2.d[0][i]), rp in pins(l)) do :
           sp => rp
       for i in 0 to 2 do :
-        require l : c1-lane
+        require l : ch1-lane
         for (sp in pins(lpddr5x32r2.d[1][i]), rp in pins(l)) do :
           sp => rp
 
-      lpddr5x32r2.cs[0][0] => bank1.L[3].P
-      lpddr5x32r2.cs[1][0] => bank1.L[3].N
-      lpddr5x32r2.cs[0][1] => bank2.L[2].P
-      lpddr5x32r2.cs[1][1] => bank2.L[2].N
-
-      lpddr5x32r2.ck[0].P => bank1.L[15].P
-      lpddr5x32r2.ck[0].N => bank1.L[15].N
-      lpddr5x32r2.ck[1].P => bank2.L[1].P
-      lpddr5x32r2.ck[1].N => bank2.L[1].N
+      for i in 0 to 2 do :
+        val ch = channels(config)[i]
+        for j in 0 to 2 do :
+          lpddr5x32r2.cs[i][j] => get-pin(base-bank, cs(ch)[j])
+        lpddr5x32r2.ck[i].P => get-pin(base-bank + ck(ch)[0], ck(ch)[1], "P")
+        lpddr5x32r2.ck[i].N => get-pin(base-bank + ck(ch)[0], ck(ch)[1], "N")
 
       for i in 0 to 7 do :
         require b : ca0-bit
@@ -2652,7 +2916,7 @@ defn make-lpddr5-packed-left-supports (base-bank:Int) :
         require b : ca1-bit
         lpddr5x32r2.ca[1][i] => b.p
 
-      lpddr5x32r2.reset_n => bank2.L[3].N
+      lpddr5x32r2.reset_n => get-pin(base-bank, reset-site(config))
 
 defn to-x5io-pin-name (bank:Int, lane:Int, polarity:String) -> String :
     val p = 2 * lane + (1 when polarity == "N" else 0)
