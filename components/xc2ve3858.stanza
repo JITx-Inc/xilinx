@@ -2491,6 +2491,7 @@ defn make-supports () :
   make-mipi-supports()
   make-x5io-supports()
   make-usb-supports()
+  make-gpio-supports()
 
 defn make-gtyp-supports () :
   inside pcb-module :
@@ -2531,6 +2532,40 @@ defn make-usb-supports () :
   inside pcb-module :
     support(usb-2-connector, self.USB2)
     support(gtr-usb3, self.USB3)
+
+defn make-gpio-supports () :
+  inside pcb-module :
+    for bank in GTYP_BANKS do :
+      for lane in 0 to 4 do :
+        support-single(gpio, self.GTYP[bank].L[lane].TX.P)
+        support-single(gpio, self.GTYP[bank].L[lane].TX.N)
+        support-single(gpio, self.GTYP[bank].L[lane].RX.P)
+        support-single(gpio, self.GTYP[bank].L[lane].RX.N)
+
+    for bank in HDIO_BANKS do :
+      for lane in 0 to 11 do :
+        support-single(gpio, self.IO_HD[bank].L[lane].P)
+        support-single(gpio, self.IO_HD[bank].L[lane].N)
+
+    for bank in PMC_MIO_BANKS do :
+      for pin in 0 to 25 do :
+        support-single(gpio, self.PMC_MIO[bank].P[pin])
+
+    for bank in LPD_MIO_BANKS do :
+      for pin in 0 to 25 do :
+        support-single(gpio, self.LPD_MIO[bank].P[pin])
+
+    for bank in MIPI_BANKS do :
+      for lane in 0 to 2 do :
+        support-single(gpio, self.MIPI[bank].L[lane].TX.P)
+        support-single(gpio, self.MIPI[bank].L[lane].TX.N)
+        support-single(gpio, self.MIPI[bank].L[lane].RX.P)
+        support-single(gpio, self.MIPI[bank].L[lane].RX.N)
+
+    for bank in X5IO_BANKS do :
+      for lane in 0 to 16 do :
+        support-single(gpio, self.IO_X5[bank].L[lane].P)
+        support-single(gpio, self.IO_X5[bank].L[lane].N)
 
 public val lpddr5x32r2 = lpddr5(LPDDR5-x32, LPDDR5-DualRank)
 
